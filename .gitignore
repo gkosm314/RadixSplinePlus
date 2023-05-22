@@ -1,2 +1,5 @@
 playground/
 .vscode/
+
+*.out
+demo.cpp
