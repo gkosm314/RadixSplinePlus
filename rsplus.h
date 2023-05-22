@@ -20,6 +20,8 @@ class RSPlus{
 
     rs::RadixSpline<KeyType> active_learned_index; //LearnedIndex to which reads are directed
     xindex::AltBtreeBuffer<KeyType, KeyType> * active_delta_index; //DeltaIndex to which writes are directed
+
+    int lookup_learned_index(const KeyType &lookup_key); //Function used to lookup the active_learned_index
 };
 
 template <class KeyType>
@@ -42,6 +44,17 @@ RSPlus<KeyType>::RSPlus(std::vector<KeyType> & k){
     active_delta_index = new xindex::AltBtreeBuffer<KeyType, KeyType>();
 }
 
+template <class KeyType>
+int RSPlus<KeyType>::lookup_learned_index(const KeyType &lookup_key){
 
+    //TODO: check return type of this function
+    //TODO: check dereference for performance penalty
+
+    //Search bound for local search using RadixSpline
+    rs::SearchBound bound = active_learned_index.GetSearchBound(lookup_key);
+    //Perform binary search inside the error bounds to find the exact position
+    auto start = begin(*keys) + bound.begin, last = begin(*keys) + bound.end;
+    return (std::lower_bound(start, last, lookup_key) - begin(*keys));
+}
 
 #endif
