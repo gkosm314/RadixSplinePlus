@@ -16,9 +16,13 @@ class RSPlus{
  public:
     RSPlus() = delete;                  
     RSPlus(std::vector<std::pair<KeyType, ValueType>> & k);
-
+    
     bool lookup_learned_index(const KeyType &lookup_key, int &res) const; //Function used to lookup the active_learned_index
     bool find_learned_index(const KeyType &lookup_key, int &res) const; //Function used to find elements in the active_learned_index
+    bool find_learned_index(const KeyType &lookup_key, int &res, ValueType &val) const;
+    
+    bool find_delta_index(const KeyType &lookup_key, ValueType &val) const;
+    void insert_delta_index(const KeyType &lookup_key, const ValueType &val) const; 
 
  private:
     std::vector<std::pair<KeyType, ValueType>> * kv_data; //The key-value store over which the active_learned_index approximates.
@@ -79,8 +83,33 @@ bool RSPlus<KeyType, ValueType>::find_learned_index(const KeyType &lookup_key, i
 
     bool keys_greater_or_equal_exist = lookup_learned_index(lookup_key, res);
 
-    if(keys_greater_or_equal_exist && (*kv_data)[res] == lookup_key) return true;
+    if(keys_greater_or_equal_exist && (*kv_data)[res].first == lookup_key) return true;
     else return false;
+}
+
+template <class KeyType, class ValueType>
+bool RSPlus<KeyType, ValueType>::find_learned_index(const KeyType &lookup_key, int &res, ValueType &val) const{
+    //Finds the exact key, if it exists. Returns true if the key exists, false otherwise.
+    //Uses lookup_learned_index() and stores the smallest key that is greater 
+    //Note: res could be out-of-bounds for the keys vector when the function returns false
+
+    bool keys_greater_or_equal_exist = lookup_learned_index(lookup_key, res);
+
+    if(keys_greater_or_equal_exist && (*kv_data)[res].first == lookup_key){
+        val = (*kv_data)[res].second;
+        return true;
+    }
+    else return false;
+}
+
+template <class KeyType, class ValueType>
+bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, ValueType &val) const{
+    return active_delta_index->get(lookup_key, val);
+}
+
+template <class KeyType, class ValueType>
+void RSPlus<KeyType, ValueType>::insert_delta_index(const KeyType &lookup_key, const ValueType &val) const{
+    active_delta_index->insert(lookup_key, val);
 }
 
 #endif
