@@ -107,6 +107,8 @@ bool RSPlus<KeyType, ValueType>::find_learned_index(const KeyType &lookup_key, i
 
 template <class KeyType, class ValueType>
 bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const{
+    // Finds the exact key in the delta index, if it exists. Returns true if the key exists, false otherwise.
+    // Attention: If the key does not exist, then &val and &deleted_flag are not changed.
     return active_delta_index->get(lookup_key, val, deleted_flag);
 }
 

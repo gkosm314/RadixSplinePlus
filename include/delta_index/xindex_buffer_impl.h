@@ -130,8 +130,11 @@ inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key) {
       // if the leaf is not full, insert the key-value pair normally and just change the value after the insert
       leaf_ptr->move_keys_backward(slot, 1);
       leaf_ptr->move_vals_backward(slot, 1);
+
+      // Below if we call atomic_val_t(0) there will be ambiguity between the val_t and the *ptr constructor
+      // But when we call split_n_insert_leaf we can use a placeholder 0 value, because the declaration defines the type of the value as val_t and the conflict is resolved.
       leaf_ptr->keys[slot] = key;
-      leaf_ptr->vals[slot] = atomic_val_t(0);
+      leaf_ptr->vals[slot] = atomic_val_t();
       leaf_ptr->key_n++;
       res = leaf_ptr->vals[slot].remove_ignoring_ptr();
 
