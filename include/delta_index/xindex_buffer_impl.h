@@ -53,8 +53,6 @@ AltBtreeBuffer<key_t, val_t>::~AltBtreeBuffer() {
 
 template <class key_t, class val_t>
 inline bool AltBtreeBuffer<key_t, val_t>::get(const key_t &key, val_t &val, bool &deleted_flag) {
-  //returns True if it found a record, whether it was deleted or not, otherwise it returns False
-  //deleted_flag is set to True if a deleted record was found, False otherwise
   uint64_t leaf_ver;
   leaf_t *leaf_ptr = locate_leaf(key, leaf_ver);
 
@@ -62,8 +60,10 @@ inline bool AltBtreeBuffer<key_t, val_t>::get(const key_t &key, val_t &val, bool
     int slot = leaf_ptr->find_first_larger_than_or_equal_to(key);
     bool res;
 
+    // returns True if it found a record, whether it was deleted or not, otherwise it returns False
+    // deleted_flag is set to True if a deleted record was found, False otherwise
     if(slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key){
-      deleted_flag = !(leaf_ptr->vals[slot].read_ignoring_ptr(val));
+      deleted_flag = !(leaf_ptr->vals[slot].read_ignoring_ptr(val)); // this call returns !removed(status);
       res = true;
     }
     else{
@@ -120,10 +120,14 @@ inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key) {
 
   bool res;
   if(slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key){
+    // if you find the key-value pair, just change the value's removed status
     res = leaf_ptr->vals[slot].remove_ignoring_ptr();
   }
   else{
+    // if you could not find the key-value pair, then insert one and change the value's removed status as you insert it
+    // code almost the same as insert-leaf when you cannot insert by overwriting
     if (!leaf_ptr->is_full()) {
+      // if the leaf is not full, insert the key-value pair normally and just change the value after the insert
       leaf_ptr->move_keys_backward(slot, 1);
       leaf_ptr->move_vals_backward(slot, 1);
       leaf_ptr->keys[slot] = key;
@@ -134,10 +138,11 @@ inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key) {
       memory_fence();
       leaf_ptr->version++;
       memory_fence();
-      leaf_ptr->unlock(); //do not remove, otherwise you return without unlocking the leaf
+      leaf_ptr->unlock(); // do not remove, otherwise you return without unlocking the leaf
       size_est++;
       return res;
     } else {
+      // if the leaf is full, insert the key-value pair using the split_n_insert_leaf function, but use the delete_after_insert flag
       res = split_n_insert_leaf(key, 0, slot, leaf_ptr, true);
       size_est++;
     }
@@ -311,6 +316,7 @@ bool AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
 
     sib_ptr->keys[slot - mid] = insert_key;
     ((leaf_t *)sib_ptr)->vals[slot - mid] = atomic_val_t(val);
+    // if remove_after_insert_flag is true, mark the value you just entered as removed
     if(remove_after_insert_flag) res = ((leaf_t *)sib_ptr)->vals[slot].remove_ignoring_ptr();
 
     sib_ptr->key_n = node_ptr->key_n - mid + 1;
@@ -323,6 +329,7 @@ bool AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
 
     node_ptr->keys[slot] = insert_key;
     ((leaf_t *)node_ptr)->vals[slot] = atomic_val_t(val);
+    // if remove_after_insert_flag is true, mark the value you just entered as removed
     if(remove_after_insert_flag) res = ((leaf_t *)sib_ptr)->vals[slot].remove_ignoring_ptr();
 
     sib_ptr->key_n = node_ptr->key_n - mid;
