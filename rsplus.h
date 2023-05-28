@@ -21,8 +21,9 @@ class RSPlus{
     bool find_learned_index(const KeyType &lookup_key, int &res) const; //Function used to find elements in the active_learned_index
     bool find_learned_index(const KeyType &lookup_key, int &res, ValueType &val) const;
     
-    bool find_delta_index(const KeyType &lookup_key, ValueType &val) const;
+    bool find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const;
     void insert_delta_index(const KeyType &lookup_key, const ValueType &val) const; 
+    void delete_delta_index(const KeyType &lookup_key) const; 
 
  private:
     std::vector<std::pair<KeyType, ValueType>> * kv_data; //The key-value store over which the active_learned_index approximates.
@@ -103,13 +104,19 @@ bool RSPlus<KeyType, ValueType>::find_learned_index(const KeyType &lookup_key, i
 }
 
 template <class KeyType, class ValueType>
-bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, ValueType &val) const{
-    return active_delta_index->get(lookup_key, val);
+bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const{
+    return active_delta_index->get(lookup_key, val, deleted_flag);
 }
 
 template <class KeyType, class ValueType>
 void RSPlus<KeyType, ValueType>::insert_delta_index(const KeyType &lookup_key, const ValueType &val) const{
-    active_delta_index->insert(lookup_key, val);
+    //even though we pass by reference, internally the function copies the value inside the buffer
+    active_delta_index->insert(lookup_key, val); 
+}
+
+template <class KeyType, class ValueType>
+void RSPlus<KeyType, ValueType>::delete_delta_index(const KeyType &lookup_key) const{
+    active_delta_index->remove(lookup_key);
 }
 
 #endif

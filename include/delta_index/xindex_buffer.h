@@ -136,7 +136,7 @@ class AltBtreeBuffer {
   AltBtreeBuffer();
   ~AltBtreeBuffer();
 
-  inline bool get(const key_t &key, val_t &val);
+  inline bool get(const key_t &key, val_t &val, bool &deleted_flag);
   inline bool update(const key_t &key, const val_t &val);
   inline void insert(const key_t &key, const val_t &val);
   inline bool remove(const key_t &key);
@@ -152,8 +152,8 @@ class AltBtreeBuffer {
   leaf_t *locate_leaf_locked(key_t key);
 
   void insert_leaf(const key_t &key, const val_t &val, leaf_t *target);
-  void split_n_insert_leaf(const key_t &key, const val_t &val, int slot,
-                           leaf_t *target);
+  bool split_n_insert_leaf(const key_t &key, const val_t &val, int slot,
+                           leaf_t *target, const bool remove_after_insert_flag = false);
 
   inline void allocate_new_block();
   inline uint8_t *allocate_node();

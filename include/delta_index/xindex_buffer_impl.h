@@ -52,15 +52,25 @@ AltBtreeBuffer<key_t, val_t>::~AltBtreeBuffer() {
 }
 
 template <class key_t, class val_t>
-inline bool AltBtreeBuffer<key_t, val_t>::get(const key_t &key, val_t &val) {
+inline bool AltBtreeBuffer<key_t, val_t>::get(const key_t &key, val_t &val, bool &deleted_flag) {
+  //returns True if it found a record, whether it was deleted or not, otherwise it returns False
+  //deleted_flag is set to True if a deleted record was found, False otherwise
   uint64_t leaf_ver;
   leaf_t *leaf_ptr = locate_leaf(key, leaf_ver);
 
   while (true) {
     int slot = leaf_ptr->find_first_larger_than_or_equal_to(key);
-    bool res = (slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key)
-                   ? leaf_ptr->vals[slot].read_ignoring_ptr(val)
-                   : false;
+    bool res;
+
+    if(slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key){
+      deleted_flag = !(leaf_ptr->vals[slot].read_ignoring_ptr(val));
+      res = true;
+    }
+    else{
+      deleted_flag = false;
+      res = false;
+    }
+
     memory_fence();
     bool locked = leaf_ptr->locked == 1;
     memory_fence();
@@ -107,10 +117,32 @@ template <class key_t, class val_t>
 inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key) {
   leaf_t *leaf_ptr = locate_leaf_locked(key);
   int slot = leaf_ptr->find_first_larger_than_or_equal_to(key);
-  bool res = (slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key)
-                 ? leaf_ptr->vals[slot].remove_ignoring_ptr()
-                 : false;
-  // no version changed
+
+  bool res;
+  if(slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key){
+    res = leaf_ptr->vals[slot].remove_ignoring_ptr();
+  }
+  else{
+    if (!leaf_ptr->is_full()) {
+      leaf_ptr->move_keys_backward(slot, 1);
+      leaf_ptr->move_vals_backward(slot, 1);
+      leaf_ptr->keys[slot] = key;
+      leaf_ptr->vals[slot] = atomic_val_t(0);
+      leaf_ptr->key_n++;
+      res = leaf_ptr->vals[slot].remove_ignoring_ptr();
+
+      memory_fence();
+      leaf_ptr->version++;
+      memory_fence();
+      leaf_ptr->unlock(); //do not remove, otherwise you return without unlocking the leaf
+      size_est++;
+      return res;
+    } else {
+      res = split_n_insert_leaf(key, 0, slot, leaf_ptr, true);
+      size_est++;
+    }
+  }
+
   leaf_ptr->unlock();
   return res;
 }
@@ -250,14 +282,16 @@ void AltBtreeBuffer<key_t, val_t>::insert_leaf(const key_t &key,
 }
 
 template <class key_t, class val_t>
-void AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
+bool AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
                                                        const val_t &val,
                                                        int slot,
-                                                       leaf_t *target) {
+                                                       leaf_t *target, const bool remove_after_insert_flag) {
   node_t *node_ptr = target;
   node_t *sib_ptr = allocate_leaf();
   sib_ptr->lock();
   sib_ptr->is_leaf = true;
+
+  bool res = true;// value of res does not matter if remove_after_insert_flag = false
 
   int mid = node_ptr->key_n / 2;
   if (slot >= mid /* if insert to the second node */ &&
@@ -277,6 +311,7 @@ void AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
 
     sib_ptr->keys[slot - mid] = insert_key;
     ((leaf_t *)sib_ptr)->vals[slot - mid] = atomic_val_t(val);
+    if(remove_after_insert_flag) res = ((leaf_t *)sib_ptr)->vals[slot].remove_ignoring_ptr();
 
     sib_ptr->key_n = node_ptr->key_n - mid + 1;
     node_ptr->key_n = mid;
@@ -288,6 +323,7 @@ void AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
 
     node_ptr->keys[slot] = insert_key;
     ((leaf_t *)node_ptr)->vals[slot] = atomic_val_t(val);
+    if(remove_after_insert_flag) res = ((leaf_t *)sib_ptr)->vals[slot].remove_ignoring_ptr();
 
     sib_ptr->key_n = node_ptr->key_n - mid;
     node_ptr->key_n = mid + 1;
@@ -351,7 +387,7 @@ void AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
       parent_ptr->node_t::unlock();
       node_ptr->node_t::unlock();
       sib_ptr->node_t::unlock();
-      return;
+      return res; // value of res does not matter if remove_after_insert_flag = false
     } else if (!parent_ptr->is_full()) {
       int slot = parent_ptr->find_first_larger_than(split_key);
       assert(parent_ptr->find_first_larger_than(split_key) ==
@@ -393,7 +429,7 @@ void AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
       parent_ptr->node_t::unlock();
       node_ptr->node_t::unlock();
       sib_ptr->node_t::unlock();
-      return;
+      return res; // value of res does not matter if remove_after_insert_flag = false
     } else {  // recursive split, knock the parent as the new node to split
       node_t *prev_sib_ptr = sib_ptr;
       node_t *prev_node_ptr = node_ptr;
