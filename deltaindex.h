@@ -10,6 +10,7 @@ template <class KeyType, class ValueType>
 class DeltaIndex{
  public:
     DeltaIndex();
+    std::size_t length();
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const; // get value of "==" key and delete status of key
     void insert(const KeyType &lookup_key, const ValueType &val) const;
     void remove(const KeyType &lookup_key) const;
@@ -33,6 +34,12 @@ DeltaIndex<KeyType, ValueType>::DeltaIndex() {
     readers_out = 0;
     writers_in = 0;
     writers_out = 0;
+}
+
+template <class KeyType, class ValueType>
+std::size_t DeltaIndex<KeyType, ValueType>::length(){
+    //Returns number of entries (including "delete" entries)
+    return buffer->size();
 }
 
 template <class KeyType, class ValueType>

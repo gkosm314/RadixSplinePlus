@@ -10,6 +10,7 @@ template <class KeyType, class ValueType>
 class LearnedIndex{
  public:
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k);
+    std::size_t length();
     bool lookup(const KeyType &lookup_key, int &offset); // get offset of ">=" key
     bool find(const KeyType &lookup_key, int &offset); // get offset of "==" key
     bool find(const KeyType &lookup_key, int &offset, ValueType &val); // get offset of "==" key and associated value
@@ -46,6 +47,11 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     rs::Builder<KeyType> rsb(min_key, max_key);
     for (const auto& kv_pair : k) rsb.AddKey(kv_pair.first);
     rspline = rsb.Finalize();
+}
+
+template <class KeyType, class ValueType>
+std::size_t LearnedIndex<KeyType, ValueType>::length(){
+    return kv_data->size();
 }
 
 template <class KeyType, class ValueType>
