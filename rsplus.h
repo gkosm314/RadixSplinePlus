@@ -91,7 +91,7 @@ bool RSPlus<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val,
         current_learned_index->readers_out++; // atomic because we are out of the critical section
     }
 
-    return key_found;
+    return key_found && !deleted_flag;
 
 }
 
