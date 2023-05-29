@@ -62,15 +62,15 @@ bool RSPlus<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val,
     DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;  
     
     current_delta_index->readers_in++; 
-    if(!frozen_delta_index) frozen_delta_index->readers_in++;
+    if(frozen_delta_index) frozen_delta_index->readers_in++;
 
     delta_index_mutex.unlock();
-
+    
     // Search for the key in the active delta index
     key_found = current_delta_index->find(lookup_key, val, deleted_flag);
 
     // If a frozen_delta_index is available
-    if(!frozen_delta_index){
+    if(frozen_delta_index){
         // If no key could be found in the current dela, do an additional lookup at in the previous delta
         if(!key_found) key_found = frozen_delta_index->find(lookup_key, val, deleted_flag);
         frozen_delta_index->readers_out++; // atomic because we are out of the critical section
