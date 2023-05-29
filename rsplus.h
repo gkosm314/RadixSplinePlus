@@ -18,7 +18,6 @@ class RSPlus{
 
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
     void insert(const KeyType &lookup_key, const ValueType &val);
-    void update(const KeyType &lookup_key, const ValueType &val);
     void remove(const KeyType &lookup_key);    
     void compact();
     
@@ -100,20 +99,6 @@ bool RSPlus<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val,
 
 template <class KeyType, class ValueType>
 void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueType &val){
-   
-    // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
-    // mutex => no concurrent increases => no need for atomic increase   
-    delta_index_mutex.lock();
-    DeltaIndex<KeyType, ValueType> * current_delta_index = active_delta_index;
-    current_delta_index->writers_in++;
-    delta_index_mutex.unlock();
-
-    current_delta_index->insert(lookup_key, val);
-    current_delta_index->writers_out++; // atomic because we are out of the critical section
-}
-
-template <class KeyType, class ValueType>
-void RSPlus<KeyType, ValueType>::update(const KeyType &lookup_key, const ValueType &val){
    
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase   
