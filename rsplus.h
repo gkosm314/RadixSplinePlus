@@ -34,8 +34,6 @@ class RSPlus{
 
 template <class KeyType, class ValueType>
 RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> & k){
-    // Assumption: keys is a non-empty vector sorted with regard to keys
-
     // Initialize new learned index
     active_learned_index = new LearnedIndex<KeyType, ValueType>(k);
     next_learned_index = nullptr;

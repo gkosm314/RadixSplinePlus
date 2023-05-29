@@ -24,8 +24,6 @@ class LearnedIndex{
 
 template <class KeyType, class ValueType>
 LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k){
-    // Assumption: keys is a non-empty vector sorted with regard to keys
- 
     //Initialize readers' counters
     readers_in = 0;
     readers_out = 0;
@@ -33,9 +31,16 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     // Keys should be pointing to the initial data
     kv_data = &k;
     
-    // Extract minimum and maximum value of the data you want to approximate with the spline
-    KeyType min_key = kv_data->front().first;
-    KeyType max_key = kv_data->back().first;
+    KeyType min_key, max_key;
+    if(!k.empty()){
+        // Extract minimum and maximum value of the data you want to approximate with the spline
+        min_key = kv_data->front().first;
+        max_key = kv_data->back().first;
+    }
+    else{
+        min_key = std::numeric_limits<KeyType>::min();
+        max_key = std::numeric_limits<KeyType>::max();
+    }
 
     // Construct the spline in a single pass by iterating over the keys
     rs::Builder<KeyType> rsb(min_key, max_key);
