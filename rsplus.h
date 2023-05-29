@@ -4,11 +4,10 @@
 #include <vector>
 #include <utility>
 #include <iostream>
+#include <mutex>
 
-#include "include/rs/builder.h"
-#include "include/rs/radix_spline.h"
-#include "include/delta_index/helper.h"
-#include "include/delta_index/xindex_buffer_impl.h"
+#include "learnedindex.h"
+#include "deltaindex.h"
 
 template <class KeyType, class ValueType>
 class RSPlus{
@@ -16,114 +15,138 @@ class RSPlus{
  public:
     RSPlus() = delete;                  
     RSPlus(std::vector<std::pair<KeyType, ValueType>> & k);
-    
-    // TODO: move these methods to private
-    bool lookup_learned_index(const KeyType &lookup_key, int &res) const; // lookup active learned index, get offset of ">=" key
-    bool find_learned_index(const KeyType &lookup_key, int &res) const; // lookup active learned index, get offset of "==" key
-    bool find_learned_index(const KeyType &lookup_key, int &res, ValueType &val) const; // lookup active learned index, get offset of "==" key + associated value
-    
-    bool find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const; // lookup active learned index, get value of "==" key + delete status of key
-    void insert_delta_index(const KeyType &lookup_key, const ValueType &val) const; // insert key-value pair in the delta index
-    void delete_delta_index(const KeyType &lookup_key) const; // delete key from the delta index
 
- private:
-    std::vector<std::pair<KeyType, ValueType>> * kv_data; //The key-value store over which the active_learned_index approximates.
+    bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
+    void insert(const KeyType &lookup_key, const ValueType &val);
+    void update(const KeyType &lookup_key, const ValueType &val);
+    void remove(const KeyType &lookup_key);    
+    void compact();
+    
+ private:   
+    LearnedIndex<KeyType, ValueType> * active_learned_index;//L earnedIndex to which reads are directed
+    LearnedIndex<KeyType, ValueType> * next_learned_index;// LearnedIndex which is currently trained
+    
+    DeltaIndex<KeyType, ValueType> * active_delta_index; // DeltaIndex to which writes are directed
+    DeltaIndex<KeyType, ValueType> * prev_delta_index; // read-only DeltaIndex from which we read values that are currently being flashed
 
-    rs::RadixSpline<KeyType> active_learned_index; //LearnedIndex to which reads are directed
-    xindex::AltBtreeBuffer<KeyType, ValueType> * active_delta_index; //DeltaIndex to which writes are directed
+    std::mutex delta_index_mutex;   // mutex that protects active_delta_index from being changed by compaction
+    std::mutex learned_index_mutex; // mutex that protects active_learned_index from being changed by compaction
 };
 
 template <class KeyType, class ValueType>
 RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> & k){
     // Assumption: keys is a non-empty vector sorted with regard to keys
 
-    // Keys should be pointing to the initial data
-    kv_data = &k;
-    
-    // Extract minimum and maximum value of the data you want to approximate with the spline
-    KeyType min_key = kv_data->front().first;
-    KeyType max_key = kv_data->back().first;
+    // Initialize new learned index
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(k);
+    next_learned_index = nullptr;
 
-    // Construct the spline in a single pass by iterating over the keys
-    rs::Builder<KeyType> rsb(min_key, max_key);
-    for (const auto& kv_pair : k) rsb.AddKey(kv_pair.first);
-    active_learned_index = rsb.Finalize();
-
-    // Create a new empty delta index
-    active_delta_index = new xindex::AltBtreeBuffer<KeyType, ValueType>();
+    // Create a new empty delta index to keep changes
+    active_delta_index = new DeltaIndex<KeyType, ValueType>();
+    prev_delta_index = nullptr;   
 }
 
 template <class KeyType, class ValueType>
-bool RSPlus<KeyType, ValueType>::lookup_learned_index(const KeyType &lookup_key, int &res) const{
-    // Finds the next smallest number in keys just greater than or equal to that number and stores it in res
-    // Returns false if such number does not exist, true otherwise
-    // Note: res will be out-of-bounds for the keys vector when the function returns false
-
-    // TODO: check return type of this function
-    // TODO: check dereference for performance penalty
-
-    // Search bound for local search using RadixSpline
-    rs::SearchBound bound = active_learned_index.GetSearchBound(lookup_key);
-    
-    // Perform binary search inside the error bounds to find the exact position
-    auto start = begin(*kv_data) + bound.begin, last = begin(*kv_data) + bound.end;
-    auto binary_search_res = std::lower_bound(start, last, lookup_key,
-                    [](const std::pair<KeyType, ValueType>& lhs, const KeyType& rhs){
-                        return lhs.first < rhs;
-                    });
-    res = binary_search_res - begin(*kv_data);
-
-    // Return true iff records greater than or equal to the given key exist in the data
-    return (res < kv_data->size());
-}
-
-template <class KeyType, class ValueType>
-bool RSPlus<KeyType, ValueType>::find_learned_index(const KeyType &lookup_key, int &res) const{
-    // Finds the exact key, if it exists. Returns true if the key exists, false otherwise.
-    // Uses lookup_learned_index() and stores the smallest key that is greater 
-    // Note: res could be out-of-bounds for the keys vector when the function returns false
-
-    bool keys_greater_or_equal_exist = lookup_learned_index(lookup_key, res);
-
-    if(keys_greater_or_equal_exist && (*kv_data)[res].first == lookup_key) return true;
-    else return false;
-}
-
-template <class KeyType, class ValueType>
-bool RSPlus<KeyType, ValueType>::find_learned_index(const KeyType &lookup_key, int &res, ValueType &val) const{
-    // Finds the exact key, if it exists. Returns true if the key exists, false otherwise.
-    // Uses lookup_learned_index() and stores the smallest key that is greater 
-    // Note: This implementation also returns the value associated with the given key
-    // Note: res could be out-of-bounds for the keys vector when the function returns false
-
-    bool keys_greater_or_equal_exist = lookup_learned_index(lookup_key, res);
-
-    if(keys_greater_or_equal_exist && (*kv_data)[res].first == lookup_key){
-        val = (*kv_data)[res].second;
-        return true;
-    }
-    else return false;
-}
-
-template <class KeyType, class ValueType>
-bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const{
+bool RSPlus<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag){
     // Finds the exact key in the delta index, if it exists. Returns true if the key exists, false otherwise.
-    // Attention: If the key does not exist, then &val and &deleted_flag are not changed.
-    return active_delta_index->get(lookup_key, val, deleted_flag);
+    // If the function returns false, then the value of &val is undefined
+
+    // Initially we have not found the key
+    bool key_found = false;
+
+    // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase
+    delta_index_mutex.lock();
+
+    DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
+    DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;  
+    
+    current_delta_index->readers_in++; 
+    if(!frozen_delta_index) frozen_delta_index->readers_in++;
+
+    delta_index_mutex.unlock();
+
+    // Search for the key in the active delta index
+    key_found = current_delta_index->find(lookup_key, val, deleted_flag);
+
+    // If a frozen_delta_index is available
+    if(!frozen_delta_index){
+        // If no key could be found in the current dela, do an additional lookup at in the previous delta
+        if(!key_found) key_found = frozen_delta_index->find(lookup_key, val, deleted_flag);
+        frozen_delta_index->readers_out++; // atomic because we are out of the critical section
+    }
+
+    current_delta_index->readers_out++; // atomic because we are out of the critical section
+
+    // If no key could be found in the deltas, 
+    if(!key_found){
+        int temp_offset;
+        deleted_flag = false;   // no entry in delta => no changes => no deletion
+
+        // Get reference to the learned index. Compaction cannot change them while we hold the lock.
+        // mutex => no concurrent increases => no need for atomic increase
+        learned_index_mutex.lock();
+        LearnedIndex<KeyType, ValueType> * const current_learned_index = active_learned_index;
+        current_learned_index->readers_in++; 
+        learned_index_mutex.unlock();
+
+        key_found = current_learned_index->find(lookup_key, temp_offset, val);
+        current_learned_index->readers_out++; // atomic because we are out of the critical section
+    }
+
+    return key_found;
+
 }
 
 template <class KeyType, class ValueType>
-void RSPlus<KeyType, ValueType>::insert_delta_index(const KeyType &lookup_key, const ValueType &val) const{
-    // Delete given key-value pair in the delta index.
-    // Even though we pass by reference, internally the value is inserted in the buffer, not the ref
-    active_delta_index->insert(lookup_key, val); 
+void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueType &val){
+   
+    // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase   
+    delta_index_mutex.lock();
+    DeltaIndex<KeyType, ValueType> * current_delta_index = active_delta_index;
+    current_delta_index->writers_in++;
+    delta_index_mutex.unlock();
+
+    current_delta_index->insert(lookup_key, val);
+    current_delta_index->writers_out++; // atomic because we are out of the critical section
 }
 
 template <class KeyType, class ValueType>
-void RSPlus<KeyType, ValueType>::delete_delta_index(const KeyType &lookup_key) const{
-    // Delete given key from delta index.
-    // If the key exists, it is marked as deleted, otherwise we insert it and then mark it as deleted.
-    active_delta_index->remove(lookup_key);
+void RSPlus<KeyType, ValueType>::update(const KeyType &lookup_key, const ValueType &val){
+   
+    // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase   
+    delta_index_mutex.lock();
+    DeltaIndex<KeyType, ValueType> * current_delta_index = active_delta_index;
+    current_delta_index->writers_in++;
+    delta_index_mutex.unlock();
+
+    current_delta_index->insert(lookup_key, val);
+    current_delta_index->writers_out++; // atomic because we are out of the critical section
+}
+
+template <class KeyType, class ValueType>
+void RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key){
+
+    // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase   
+    delta_index_mutex.lock();
+    DeltaIndex<KeyType, ValueType> * current_delta_index = active_delta_index;
+    current_delta_index->writers_in++;
+    delta_index_mutex.unlock();
+
+    current_delta_index->remove(lookup_key);
+    current_delta_index->writers_out++; // atomic because we are out of the critical section
+}
+
+template <class KeyType, class ValueType>
+void RSPlus<KeyType, ValueType>::compact(){
+    std::cout << "Not implemented yet." << std::endl;
 }
 
 #endif
+
+// TODO: think about different lock for delta-write and different for delta-read (compaction must take both)
+// TODO: think about different lock for active-delta and different for prev-delta (compaction must take both)
+// NOTE: maybe disable assertions for experiments
