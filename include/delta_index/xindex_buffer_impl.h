@@ -749,10 +749,9 @@ AltBtreeBuffer<key_t, val_t>::DataSource::DataSource(key_t begin,
     int key_n = leaf_ptr->key_n;
     pos = 0;
     for (int i = slot; i < key_n; i++) {
-      if (leaf_ptr->vals[i].read_ignoring_ptr(vals[pos])) {
-        keys[pos] = leaf_ptr->keys[i];
-        pos++;
-      }
+      keys[pos] = leaf_ptr->keys[i];
+      is_removed[pos] = !(leaf_ptr->vals[i].read_ignoring_ptr(vals[pos])); //returns !removed(status);
+      pos++;
     }
     next = leaf_ptr->next;
     memory_fence();
@@ -799,10 +798,9 @@ void AltBtreeBuffer<key_t, val_t>::DataSource::advance_to_next_valid() {
         int key_n = leaf_ptr->key_n;
         pos = 0;
         for (int i = 0; i < key_n; i++) {
-          if (leaf_ptr->vals[i].read_ignoring_ptr(vals[pos])) {
-            keys[pos] = leaf_ptr->keys[i];
-            pos++;
-          }
+          keys[pos] = leaf_ptr->keys[i];
+          is_removed[pos] = !(leaf_ptr->vals[i].read_ignoring_ptr(vals[pos])); //returns !removed(status);
+          pos++;
         }
         next = leaf_ptr->next;
         memory_fence();
@@ -838,6 +836,11 @@ const key_t &AltBtreeBuffer<key_t, val_t>::DataSource::get_key() {
 template <class key_t, class val_t>
 const val_t &AltBtreeBuffer<key_t, val_t>::DataSource::get_val() {
   return vals[pos];
+}
+
+template <class key_t, class val_t>
+const bool &AltBtreeBuffer<key_t, val_t>::DataSource::get_is_removed() {
+  return is_removed[pos];
 }
 
 template <class key_t, class val_t>

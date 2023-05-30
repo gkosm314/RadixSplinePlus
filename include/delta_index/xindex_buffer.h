@@ -109,12 +109,14 @@ class AltBtreeBuffer {
     void advance_to_next_valid();
     const key_t &get_key();
     const val_t &get_val();
+    const bool &get_is_removed();
 
     leaf_t *next = nullptr;
     bool has_next = false;
     int pos = 0, n = 0;
     key_t keys[node_capacity];
     val_t vals[node_capacity];
+    bool is_removed[node_capacity];
   };
 
   struct RefSource {
