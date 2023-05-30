@@ -320,7 +320,7 @@ bool AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
     sib_ptr->keys[slot - mid] = insert_key;
     ((leaf_t *)sib_ptr)->vals[slot - mid] = atomic_val_t(val);
     // if remove_after_insert_flag is true, mark the value you just entered as removed
-    if(remove_after_insert_flag) res = ((leaf_t *)sib_ptr)->vals[slot].remove_ignoring_ptr();
+    if(remove_after_insert_flag) res = ((leaf_t *)sib_ptr)->vals[slot - mid].remove_ignoring_ptr();
 
     sib_ptr->key_n = node_ptr->key_n - mid + 1;
     node_ptr->key_n = mid;
@@ -333,7 +333,7 @@ bool AltBtreeBuffer<key_t, val_t>::split_n_insert_leaf(const key_t &insert_key,
     node_ptr->keys[slot] = insert_key;
     ((leaf_t *)node_ptr)->vals[slot] = atomic_val_t(val);
     // if remove_after_insert_flag is true, mark the value you just entered as removed
-    if(remove_after_insert_flag) res = ((leaf_t *)sib_ptr)->vals[slot].remove_ignoring_ptr();
+    if(remove_after_insert_flag) res = ((leaf_t *)node_ptr)->vals[slot].remove_ignoring_ptr();
 
     sib_ptr->key_n = node_ptr->key_n - mid;
     node_ptr->key_n = mid + 1;
