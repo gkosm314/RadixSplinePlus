@@ -104,21 +104,6 @@ class AltBtreeBuffer {
     Leaf *next;
   };
 
-  struct DataSource {
-    DataSource(key_t begin, AltBtreeBuffer *buffer);
-    void advance_to_next_valid();
-    const key_t &get_key();
-    const val_t &get_val();
-    const bool &get_is_removed();
-
-    leaf_t *next = nullptr;
-    bool has_next = false;
-    int pos = 0, n = 0;
-    key_t keys[node_capacity];
-    val_t vals[node_capacity];
-    bool is_removed[node_capacity];
-  };
-
   struct RefSource {
     typedef AtomicVal<val_t> atomic_val_t;
 
@@ -148,6 +133,22 @@ class AltBtreeBuffer {
                          std::vector<std::pair<key_t, val_t>> &result);
 
   inline uint32_t size();
+
+  struct DataSource {
+    DataSource(key_t begin, AltBtreeBuffer *buffer);
+    void advance_to_next_valid();
+    const key_t &get_key();
+    const val_t &get_val();
+    const bool &get_is_removed();
+
+    leaf_t *next = nullptr;
+    bool has_next = false;
+    int pos = 0, n = 0;
+    key_t keys[node_capacity];
+    val_t vals[node_capacity];
+    bool is_removed[node_capacity];
+    // TODO: try replacing the three arrays with a vector of tuples to improve caching performance
+  };  
 
  private:
   leaf_t *locate_leaf(key_t key, uint64_t &version);

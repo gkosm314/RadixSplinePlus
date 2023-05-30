@@ -7,13 +7,15 @@
 #include "include/delta_index/xindex_buffer_impl.h"
 
 template <class KeyType, class ValueType>
-class DeltaIndex{
+class DeltaIndex{  
  public:
+    using DeltaIndexRecord = typename xindex::AltBtreeBuffer<KeyType, KeyType>::DataSource;
+
     DeltaIndex();
-    std::size_t length();
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const; // get value of "==" key and delete status of key
     void insert(const KeyType &lookup_key, const ValueType &val) const;
     void remove(const KeyType &lookup_key) const;
+    std::size_t length();
 
     uint64_t readers_in;
     std::atomic<uint64_t> readers_out;
