@@ -10,11 +10,17 @@ template <class KeyType, class ValueType>
 class LearnedIndex{
  public:
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k);
+    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::Builder<KeyType> & rsb);
     std::size_t length();
     bool lookup(const KeyType &lookup_key, int &offset); // get offset of ">=" key
     bool find(const KeyType &lookup_key, int &offset); // get offset of "==" key
     bool find(const KeyType &lookup_key, int &offset, ValueType &val); // get offset of "==" key and associated value
     
+    KeyType min_key, max_key;
+    bool empty() const;
+    typename std::vector<std::pair<KeyType, ValueType>>::iterator begin() const;
+    typename std::vector<std::pair<KeyType, ValueType>>::iterator end() const;
+
     uint64_t readers_in;
     std::atomic<uint64_t> readers_out;
     
@@ -25,14 +31,13 @@ class LearnedIndex{
 
 template <class KeyType, class ValueType>
 LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k){
-    //Initialize readers' counters
+    // Initialize readers' counters
     readers_in = 0;
     readers_out = 0;
 
     // Keys should be pointing to the initial data
     kv_data = &k;
     
-    KeyType min_key, max_key;
     if(!k.empty()){
         // Extract minimum and maximum value of the data you want to approximate with the spline
         min_key = kv_data->front().first;
@@ -46,6 +51,19 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     // Construct the spline in a single pass by iterating over the keys
     rs::Builder<KeyType> rsb(min_key, max_key);
     for (const auto& kv_pair : k) rsb.AddKey(kv_pair.first);
+    rspline = rsb.Finalize();
+}
+
+template <class KeyType, class ValueType>
+LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::Builder<KeyType> & rsb){
+    // Initialize readers' counters
+    readers_in = 0;
+    readers_out = 0;
+
+    // Keys should be pointing to the initial data
+    kv_data = &k;
+    
+    // Construct spline by finalizing the builder that was passed as a parameter
     rspline = rsb.Finalize();
 }
 
@@ -103,6 +121,21 @@ bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offs
         return true;
     }
     else return false;
+}
+
+template <class KeyType, class ValueType>
+bool LearnedIndex<KeyType, ValueType>::empty() const{
+    return kv_data->empty();
+}
+
+template <class KeyType, class ValueType>
+typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedIndex<KeyType, ValueType>::begin() const{
+    return kv_data->begin();
+}
+
+template <class KeyType, class ValueType>
+typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedIndex<KeyType, ValueType>::end() const{
+    return kv_data->end();
 }
 
 #endif
