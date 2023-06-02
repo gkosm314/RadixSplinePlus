@@ -89,12 +89,12 @@ bool LearnedIndex<KeyType, ValueType>::lookup(const KeyType &lookup_key, int &of
     rs::SearchBound bound = rspline.GetSearchBound(lookup_key);
     
     // Perform binary search inside the error bounds to find the exact position
-    auto start = begin(*kv_data) + bound.begin, last = begin(*kv_data) + bound.end;
+    auto start = std::begin(*kv_data) + bound.begin, last = std::begin(*kv_data) + bound.end;
     auto binary_search_offset = std::lower_bound(start, last, lookup_key,
                     [](const std::pair<KeyType, ValueType>& lhs, const KeyType& rhs){
                         return lhs.first < rhs;
                     });
-    offset = binary_search_offset - begin(*kv_data);
+    offset = binary_search_offset - std::begin(*kv_data);
 
     // Return true iff records greater than or equal to the given key exist in the data
     return (offset < kv_data->size());
