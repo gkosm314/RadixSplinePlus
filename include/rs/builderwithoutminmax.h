@@ -11,9 +11,9 @@ namespace rs {
 
 // Allows building a `RadixSpline` in a single pass over sorted data.
 template <class KeyType>
-class BuilderTwoSteps {
+class BuilderWithoutMinMax {
  public:
-  BuilderTwoSteps(size_t num_radix_bits = 18,
+  BuilderWithoutMinMax(size_t num_radix_bits = 18,
           size_t max_error = 32)
       : num_radix_bits_(num_radix_bits),
         max_error_(max_error),

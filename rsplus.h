@@ -156,18 +156,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     deltaIter.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
 
     // Construct a radix spline builder
-    // TODO:
-    // KeyType new_min_key, new_max_key;
-    // if(!active_learned_index->empty()){
-    //     new_min_key = std::min(active_learned_index->min_key, deltaIter.get_key());
-    //     new_max_key = std::max(active_learned_index->max_key, ...);
-    // }
-    // else{
-    //     new_min_key = deltaIter.get_key();
-    //     new_max_key = ...; 
-    // }
-    // rs::Builder<KeyType> rsbuilder(new_min_key, new_max_key);
-    // rs::Builder<KeyType> rsbuilder(std::numeric_limits<KeyType>::min(), std::numeric_limits<KeyType>::max());
+    rs::BuilderWithoutMinMax<KeyType> rsbuilder{};
 
     KeyType dataKey;
     KeyType deltaKey;

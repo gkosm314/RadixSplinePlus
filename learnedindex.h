@@ -4,13 +4,17 @@
 #include <atomic>
 
 #include "include/rs/builder.h"
+#include "include/rs/builderwithoutminmax.h"
 #include "include/rs/radix_spline.h"
 
 template <class KeyType, class ValueType>
 class LearnedIndex{
  public:
+    // constructor1 - you fill the builder
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k);
-    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::Builder<KeyType> & rsb);
+    // constructor2 - builder is already filled for you
+    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::BuilderWithoutMinMax<KeyType> & rsb); 
+    
     std::size_t length();
     bool lookup(const KeyType &lookup_key, int &offset); // get offset of ">=" key
     bool find(const KeyType &lookup_key, int &offset); // get offset of "==" key
@@ -55,7 +59,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
 }
 
 template <class KeyType, class ValueType>
-LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::Builder<KeyType> & rsb){
+LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::BuilderWithoutMinMax<KeyType> & rsb){
     // Initialize readers' counters
     readers_in = 0;
     readers_out = 0;
@@ -64,6 +68,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     kv_data = &k;
     
     // Construct spline by finalizing the builder that was passed as a parameter
+    // Nothing changes if the builder is empty
     rspline = rsb.Finalize();
 }
 
