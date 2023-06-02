@@ -17,6 +17,10 @@ class DeltaIndex{
     void remove(const KeyType &lookup_key) const;
     std::size_t length();
 
+    DeltaIndexRecord get_iter(const KeyType &target){
+        return DeltaIndexRecord(target, buffer);
+    }
+
     uint64_t readers_in;
     std::atomic<uint64_t> readers_out;
     

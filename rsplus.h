@@ -152,7 +152,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     auto dataIter = active_learned_index->begin();
     auto dataIterEnd = active_learned_index->end();
 
-    typename DeltaIndex<KeyType, ValueType>::DeltaIndexRecord deltaIter(std::numeric_limits<KeyType>::min(), prev_delta_index);
+    typename DeltaIndex<KeyType, ValueType>::DeltaIndexRecord deltaIter = prev_delta_index->get_iter(std::numeric_limits<KeyType>::min());
     deltaIter.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
 
     // Construct a radix spline builder
@@ -180,7 +180,7 @@ void RSPlus<KeyType, ValueType>::compact(){
         // if dataKey >= deltaKey then there are changes in the delta index that we have to take into account
         else{
             if(!deltaIter.get_is_removed()){    // skip deleted records
-                kv_new_data->push_back(make_pair(deltaKey, deltaIter.get_val()));
+                kv_new_data->push_back(std::make_pair(deltaKey, deltaIter.get_val()));
                 rsbuilder.AddKey(deltaKey);
             }
             deltaIter.advance_to_next_valid(); 
@@ -198,7 +198,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     // If only the delta index has elements left, just add them all in the new merged index
     while(deltaIter.has_next){
         if(!deltaIter.get_is_removed()){
-            kv_new_data->push_back(make_pair(deltaIter.get_key(), deltaIter.get_val()));
+            kv_new_data->push_back(std::make_pair(deltaIter.get_key(), deltaIter.get_val()));
             rsbuilder.AddKey(deltaKey);
         }
         deltaIter.advance_to_next_valid();
@@ -210,8 +210,8 @@ void RSPlus<KeyType, ValueType>::compact(){
     // Grab the mutex so that no other thread reads the indexes locations while you change them.
     // TODO: think if it would be better to merge them
     learned_index_mutex.lock();
-    LearnedIndex<KeyType, ValueType> * learned_index_to_garbage_collect = active_delta_index;
-    active_delta_index = next_learned_index;
+    LearnedIndex<KeyType, ValueType> * learned_index_to_garbage_collect = active_learned_index;
+    active_learned_index = next_learned_index;
     learned_index_mutex.unlock();  
 
     delta_index_mutex.lock();
