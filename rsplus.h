@@ -13,7 +13,7 @@ template <class KeyType, class ValueType>
 class RSPlus{
 
  public:
-    RSPlus() = delete;                  
+    RSPlus();                  
     RSPlus(std::vector<std::pair<KeyType, ValueType>> & k);
 
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
@@ -32,6 +32,21 @@ class RSPlus{
     std::mutex learned_index_mutex; // mutex that protects active_learned_index from being changed by compaction
     std::mutex compaction_mutex;    // mutex that ensures that only one compaction can take place at a given time
 };
+
+template <class KeyType, class ValueType>
+RSPlus<KeyType, ValueType>::RSPlus() {
+
+    // Create empty data vector
+    std::vector<std::pair<KeyType, ValueType>> * k = new std::vector<std::pair<KeyType, ValueType>>;
+
+    // Initialize new learned index
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(*k);
+    next_learned_index = nullptr;
+
+    // Create a new empty delta index to keep changes
+    active_delta_index = new DeltaIndex<KeyType, ValueType>();
+    prev_delta_index = nullptr;   
+}
 
 template <class KeyType, class ValueType>
 RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> & k){
