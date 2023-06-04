@@ -12,10 +12,10 @@ class DeltaIndex{
     using DeltaIndexRecord = typename xindex::AltBtreeBuffer<KeyType, KeyType>::DataSource;
 
     DeltaIndex();
-    bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const; // get value of "==" key and delete status of key
-    void insert(const KeyType &lookup_key, const ValueType &val) const;
-    void remove(const KeyType &lookup_key) const;
-    std::size_t length();
+    inline bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const; // get value of "==" key and delete status of key
+    inline void insert(const KeyType &lookup_key, const ValueType &val) const;
+    inline void remove(const KeyType &lookup_key) const;
+    inline std::size_t length();
 
     DeltaIndexRecord get_iter(const KeyType &target){
         return DeltaIndexRecord(target, buffer);
@@ -43,13 +43,13 @@ DeltaIndex<KeyType, ValueType>::DeltaIndex() {
 }
 
 template <class KeyType, class ValueType>
-std::size_t DeltaIndex<KeyType, ValueType>::length(){
+inline std::size_t DeltaIndex<KeyType, ValueType>::length(){
     //Returns number of entries (including "delete" entries)
     return buffer->size();
 }
 
 template <class KeyType, class ValueType>
-bool DeltaIndex<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const{
+inline bool DeltaIndex<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const{
     // Finds the exact key in the delta index, if it exists.
     // Returns True if it found a record, whether it was deleted or not, otherwise it returns False
     // Attention: If the key does not exist, then &val and &deleted_flag are not changed.
@@ -57,14 +57,14 @@ bool DeltaIndex<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &
 }
 
 template <class KeyType, class ValueType>
-void DeltaIndex<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueType &val) const{
+inline void DeltaIndex<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueType &val) const{
     // Delete given key-value pair in the delta index.
     // Even though we pass by reference, internally the value is inserted in the buffer, not the ref
     buffer->insert(lookup_key, val); 
 }
 
 template <class KeyType, class ValueType>
-void DeltaIndex<KeyType, ValueType>::remove(const KeyType &lookup_key) const{
+inline void DeltaIndex<KeyType, ValueType>::remove(const KeyType &lookup_key) const{
     // Delete given key from delta index.
     // If the key exists, it is marked as deleted, otherwise we insert it and then mark it as deleted.
     buffer->remove(lookup_key);

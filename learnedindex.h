@@ -15,15 +15,15 @@ class LearnedIndex{
     // constructor2 - builder is already filled for you
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::BuilderWithoutMinMax<KeyType> & rsb); 
     
-    std::size_t length();
+    inline std::size_t length();
     bool lookup(const KeyType &lookup_key, int &offset); // get offset of ">=" key
-    bool find(const KeyType &lookup_key, int &offset); // get offset of "==" key
-    bool find(const KeyType &lookup_key, int &offset, ValueType &val); // get offset of "==" key and associated value
+    inline bool find(const KeyType &lookup_key, int &offset); // get offset of "==" key
+    inline bool find(const KeyType &lookup_key, int &offset, ValueType &val); // get offset of "==" key and associated value
     
     KeyType min_key, max_key;
-    bool empty() const;
-    typename std::vector<std::pair<KeyType, ValueType>>::iterator begin() const;
-    typename std::vector<std::pair<KeyType, ValueType>>::iterator end() const;
+    inline bool empty() const;
+    inline typename std::vector<std::pair<KeyType, ValueType>>::iterator begin() const;
+    inline typename std::vector<std::pair<KeyType, ValueType>>::iterator end() const;
 
     uint64_t readers_in;
     std::atomic<uint64_t> readers_out;
@@ -73,7 +73,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
 }
 
 template <class KeyType, class ValueType>
-std::size_t LearnedIndex<KeyType, ValueType>::length(){
+inline std::size_t LearnedIndex<KeyType, ValueType>::length(){
     return kv_data->size();
 }
 
@@ -101,7 +101,7 @@ bool LearnedIndex<KeyType, ValueType>::lookup(const KeyType &lookup_key, int &of
 }
 
 template <class KeyType, class ValueType>
-bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offset){
+inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offset){
     // Finds the exact key, if it exists. Returns true if the key exists, false otherwise.
     // Uses lookup() and stores the smallest key that is greater 
     // Note: offset could be out-of-bounds for the keys vector when the function returns false
@@ -113,7 +113,7 @@ bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offs
 }
 
 template <class KeyType, class ValueType>
-bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offset, ValueType &val){
+inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offset, ValueType &val){
     // Finds the exact key, if it exists. Returns true if the key exists, false otherwise.
     // Uses lookup() and stores the smallest key that is greater 
     // Note: This implementation also returns the value associated with the given key
@@ -129,17 +129,17 @@ bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offs
 }
 
 template <class KeyType, class ValueType>
-bool LearnedIndex<KeyType, ValueType>::empty() const{
+inline bool LearnedIndex<KeyType, ValueType>::empty() const{
     return kv_data->empty();
 }
 
 template <class KeyType, class ValueType>
-typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedIndex<KeyType, ValueType>::begin() const{
+inline typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedIndex<KeyType, ValueType>::begin() const{
     return kv_data->begin();
 }
 
 template <class KeyType, class ValueType>
-typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedIndex<KeyType, ValueType>::end() const{
+inline typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedIndex<KeyType, ValueType>::end() const{
     return kv_data->end();
 }
 

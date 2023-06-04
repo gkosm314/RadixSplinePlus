@@ -17,8 +17,8 @@ class RSPlus{
     RSPlus(std::vector<std::pair<KeyType, ValueType>> & k);
 
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
-    void insert(const KeyType &lookup_key, const ValueType &val);
-    void remove(const KeyType &lookup_key);    
+    inline void insert(const KeyType &lookup_key, const ValueType &val);
+    inline void remove(const KeyType &lookup_key);    
     void compact();
     
  private:   
@@ -97,7 +97,7 @@ bool RSPlus<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val,
 }
 
 template <class KeyType, class ValueType>
-void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueType &val){
+inline void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueType &val){
    
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase   
@@ -111,7 +111,7 @@ void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueTy
 }
 
 template <class KeyType, class ValueType>
-void RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key){
+inline void RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key){
 
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase   
