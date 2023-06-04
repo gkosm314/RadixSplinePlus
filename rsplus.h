@@ -191,7 +191,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     // If only the learned index has elements left, just add them all in the new merged index
     while(dataIter != dataIterEnd){
         kv_new_data->push_back(*dataIter);
-        rsbuilder.AddKey(dataKey);
+        rsbuilder.AddKey((*dataIter).first);
         dataIter++;    
     }
 
@@ -199,7 +199,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     while(deltaIter.has_next){
         if(!deltaIter.get_is_removed()){
             kv_new_data->push_back(std::make_pair(deltaIter.get_key(), deltaIter.get_val()));
-            rsbuilder.AddKey(deltaKey);
+            rsbuilder.AddKey(deltaIter.get_key());
         }
         deltaIter.advance_to_next_valid();
     }
