@@ -15,6 +15,7 @@ class RSPlus{
  public:
     RSPlus();                  
     RSPlus(std::vector<std::pair<KeyType, ValueType>> & k);
+    ~RSPlus();
 
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
     inline void insert(const KeyType &lookup_key, const ValueType &val);
@@ -57,6 +58,16 @@ RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> & 
     // Create a new empty delta index to keep changes
     active_delta_index = new DeltaIndex<KeyType, ValueType>();
     prev_delta_index = nullptr;   
+}
+
+template <class KeyType, class ValueType>
+RSPlus<KeyType, ValueType>::~RSPlus() {
+    delete active_learned_index;
+    delete active_delta_index;
+
+    // If the class is used as intended, these two should not be called
+    if (prev_delta_index) delete prev_delta_index;
+    if (next_learned_index) delete next_learned_index;
 }
 
 template <class KeyType, class ValueType>
@@ -251,9 +262,6 @@ void RSPlus<KeyType, ValueType>::compact(){
 
 #endif
 
-// TODO: keep track of max for RadixSpline building
-// TODO: write destructors for the classes
 // TODO: think about different lock for delta-write and different for delta-read (compaction must take both)
 // TODO: think about different lock for active-delta and different for prev-delta (compaction must take both)
 // NOTE: maybe disable assertions for experiments
-// NOTE: use inline functions

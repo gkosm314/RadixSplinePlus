@@ -14,6 +14,8 @@ class LearnedIndex{
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k);
     // constructor2 - builder is already filled for you
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::BuilderWithoutMinMax<KeyType> & rsb); 
+    // destructor
+    ~LearnedIndex();
     
     inline std::size_t length();
     bool lookup(const KeyType &lookup_key, int &offset); // get offset of ">=" key
@@ -70,6 +72,11 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     // Construct spline by finalizing the builder that was passed as a parameter
     // Nothing changes if the builder is empty
     rspline = rsb.Finalize();
+}
+
+template <class KeyType, class ValueType>
+LearnedIndex<KeyType, ValueType>::~LearnedIndex(){
+    delete kv_data;
 }
 
 template <class KeyType, class ValueType>

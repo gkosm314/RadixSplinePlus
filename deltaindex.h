@@ -12,6 +12,7 @@ class DeltaIndex{
     using DeltaIndexRecord = typename xindex::AltBtreeBuffer<KeyType, KeyType>::DataSource;
 
     DeltaIndex();
+    ~DeltaIndex();
     inline bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const; // get value of "==" key and delete status of key
     inline void insert(const KeyType &lookup_key, const ValueType &val) const;
     inline void remove(const KeyType &lookup_key) const;
@@ -40,6 +41,11 @@ DeltaIndex<KeyType, ValueType>::DeltaIndex() {
     readers_out = 0;
     writers_in = 0;
     writers_out = 0;
+}
+
+template <class KeyType, class ValueType>
+DeltaIndex<KeyType, ValueType>::~DeltaIndex() {
+    delete buffer;
 }
 
 template <class KeyType, class ValueType>
