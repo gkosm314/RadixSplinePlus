@@ -49,7 +49,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     }
     else{
         min_key = std::numeric_limits<KeyType>::min();
-        max_key = std::numeric_limits<KeyType>::max();
+        max_key = std::numeric_limits<KeyType>::min();
     }
 
     // Construct the spline in a single pass by iterating over the keys
