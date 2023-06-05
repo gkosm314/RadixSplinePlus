@@ -315,7 +315,10 @@ size_t RSPlus<KeyType, ValueType>::scan(const KeyType &lookup_key, const size_t 
 template <class KeyType, class ValueType>
 size_t RSPlus<KeyType, ValueType>::scan2(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
             LearnedIndex<KeyType, ValueType> * const learned_index,
-            DeltaIndex<KeyType, ValueType> * const delta_index) {            
+            DeltaIndex<KeyType, ValueType> * const delta_index) {       
+
+    bool learned_index_readers_updated = false;     
+    bool delta_index_readers_updated = false;     
 
     // Grab iterators for learned index and data source for delta index
     int learned_index_offset;
@@ -356,6 +359,16 @@ size_t RSPlus<KeyType, ValueType>::scan2(const KeyType &lookup_key, const size_t
         }
     }
 
+    // For the indexes that we are not going to read again, increase the readers_out counter
+    if(dataIter == dataIterEnd) {
+        learned_index_readers_updated = true;
+        learned_index->readers_out++;  // atomic because we are out of the critical section
+    }
+    if(!deltaIter.has_next){
+        delta_index_readers_updated = true;
+        delta_index->readers_out++;  // atomic because we are out of the critical section        
+    }
+
     // If only the learned index has elements left, just add as many as you can to the results
     while(records_left && dataIter != dataIterEnd){
         result.push_back(*dataIter);
@@ -371,6 +384,10 @@ size_t RSPlus<KeyType, ValueType>::scan2(const KeyType &lookup_key, const size_t
         }
         deltaIter.advance_to_next_valid();
     }
+
+    // For the indexes that whose readers_out counter was not increased, increase the counter
+    if(!learned_index_readers_updated) learned_index->readers_out++;  // atomic because we are out of the critical section
+    if(!delta_index_readers_updated) delta_index->readers_out++;  // atomic because we are out of the critical section        
 
     return num - records_left;
 }
