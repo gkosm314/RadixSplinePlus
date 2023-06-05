@@ -23,13 +23,6 @@ class RSPlus{
     inline void remove(const KeyType &lookup_key);    
     void compact();
     size_t scan(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result);
-    size_t scan2(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
-                LearnedIndex<KeyType, ValueType> * const learned_index,
-                DeltaIndex<KeyType, ValueType> * const delta_index);
-    size_t scan3(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
-                LearnedIndex<KeyType, ValueType> * const learned_index,
-                DeltaIndex<KeyType, ValueType> * const current_delta_index,       
-                DeltaIndex<KeyType, ValueType> * const frozen_delta_index);
  
  private:   
     LearnedIndex<KeyType, ValueType> * active_learned_index;//L earnedIndex to which reads are directed
@@ -44,6 +37,10 @@ class RSPlus{
 
     bool find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
     bool find_learned_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
+    size_t scan_aux(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
+                LearnedIndex<KeyType, ValueType> * const learned_index,
+                DeltaIndex<KeyType, ValueType> * const current_delta_index,       
+                DeltaIndex<KeyType, ValueType> * const frozen_delta_index);    
 };
 
 template <class KeyType, class ValueType>
@@ -220,7 +217,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     // Compact changes with the data and train the new spline in a single pass
 
     // has_next = has more things for you to read
-    while(deltaIter.has_next && dataIter != dataIterEnd){
+    while(deltaIter.get_has_next() && dataIter != dataIterEnd){
     // While both indexes have elements left:
         dataKey = (*dataIter).first;    // key of current element in learned index
         deltaKey = deltaIter.get_key(); // key of current element in delta index
@@ -252,7 +249,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     }
 
     // If only the delta index has elements left, just add them all in the new merged index
-    while(deltaIter.has_next){
+    while(deltaIter.get_has_next()){
         if(!deltaIter.get_is_removed()){
             kv_new_data->push_back(std::make_pair(deltaIter.get_key(), deltaIter.get_val()));
             rsbuilder.AddKey(deltaIter.get_key());
@@ -313,92 +310,11 @@ size_t RSPlus<KeyType, ValueType>::scan(const KeyType &lookup_key, const size_t 
     result.reserve(num);
     
     // Call the correct version of the scan function - readers_out is increased inside each function call
-    if(frozen_delta_index) return scan3(lookup_key, num, result, current_learned_index, current_delta_index, frozen_delta_index);
-    else return scan2(lookup_key, num, result, current_learned_index, current_delta_index);
+    return scan_aux(lookup_key, num, result, current_learned_index, current_delta_index, frozen_delta_index);
 }
 
 template <class KeyType, class ValueType>
-size_t RSPlus<KeyType, ValueType>::scan2(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
-            LearnedIndex<KeyType, ValueType> * const learned_index,
-            DeltaIndex<KeyType, ValueType> * const delta_index) {       
-
-    bool learned_index_readers_updated = false;     
-    bool delta_index_readers_updated = false;     
-
-    // Grab iterators for learned index and data source for delta index
-    int learned_index_offset;
-    // get offset using lookup(), if offset is valid then increase begin iterator by that many positions, otherwise assign end iterator
-    auto dataIter = learned_index->lookup(lookup_key,learned_index_offset) ? learned_index->begin() + learned_index_offset : learned_index->end();
-    auto dataIterEnd = learned_index->end();
-
-    typename DeltaIndex<KeyType, ValueType>::DeltaIndexRecord deltaIter = delta_index->get_iter(lookup_key);
-    deltaIter.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
-
-    size_t records_left = num; // how many records are left to scan
-
-    KeyType dataKey;
-    KeyType deltaKey;       
-
-    // has_next = has more things for you to read
-    while(records_left && deltaIter.has_next && dataIter != dataIterEnd){
-    // While both indexes have elements left:
-        dataKey = (*dataIter).first;    // key of current element in learned index
-        deltaKey = deltaIter.get_key(); // key of current element in delta index
-
-        // Invariant: all changes related to keys < deltaKey have been applied
-        
-        // if dataKey < deltaKey then add dataKey to the results
-        if(dataKey < deltaKey){
-            result.push_back(*dataIter);
-            records_left--;
-            dataIter++;
-        }
-        // if dataKey >= deltaKey then there are changes in the delta index that we have to take into account
-        else{
-            if(!deltaIter.get_is_removed()){    // skip deleted records
-                result.push_back(std::make_pair(deltaKey, deltaIter.get_val()));
-                records_left--;
-            }
-            deltaIter.advance_to_next_valid(); 
-            if(dataKey == deltaKey) dataIter++; // Assumption: no duplicates - in case of "=", skip this record since it overwritten by the changes in the delta index
-        }
-    }
-
-    // For the indexes that we are not going to read again, increase the readers_out counter
-    if(dataIter == dataIterEnd) {
-        learned_index_readers_updated = true;
-        learned_index->readers_out++;  // atomic because we are out of the critical section
-    }
-    if(!deltaIter.has_next){
-        delta_index_readers_updated = true;
-        delta_index->readers_out++;  // atomic because we are out of the critical section        
-    }
-
-    // If only the learned index has elements left, just add as many as you can to the results
-    while(records_left && dataIter != dataIterEnd){
-        result.push_back(*dataIter);
-        records_left--;
-        dataIter++;    
-    }
-
-    // If only the delta index has elements left, just add as many as you can to the results
-    while(records_left && deltaIter.has_next){
-        if(!deltaIter.get_is_removed()){
-            result.push_back(std::make_pair(deltaIter.get_key(), deltaIter.get_val()));
-            records_left--;
-        }
-        deltaIter.advance_to_next_valid();
-    }
-
-    // For the indexes that whose readers_out counter was not increased, increase the counter
-    if(!learned_index_readers_updated) learned_index->readers_out++;  // atomic because we are out of the critical section
-    if(!delta_index_readers_updated) delta_index->readers_out++;  // atomic because we are out of the critical section        
-
-    return num - records_left;
-}
-
-template <class KeyType, class ValueType>
-size_t RSPlus<KeyType, ValueType>::scan3(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
+size_t RSPlus<KeyType, ValueType>::scan_aux(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
             LearnedIndex<KeyType, ValueType> * const learned_index,
             DeltaIndex<KeyType, ValueType> * const current_delta_index,       
             DeltaIndex<KeyType, ValueType> * const frozen_delta_index) {       
@@ -412,7 +328,17 @@ size_t RSPlus<KeyType, ValueType>::scan3(const KeyType &lookup_key, const size_t
     auto dataIter = learned_index->lookup(lookup_key,learned_index_offset) ? learned_index->begin() + learned_index_offset : learned_index->end();
     auto dataIterEnd = learned_index->end();
 
-    BiDataSource<KeyType, ValueType> deltaIter(lookup_key, current_delta_index, frozen_delta_index);
+    Source<KeyType, ValueType> * deltaIter;
+
+    if(frozen_delta_index) {
+        BiDataSource<KeyType, ValueType> deltaIterObj(lookup_key, current_delta_index, frozen_delta_index);
+        deltaIter = &deltaIterObj;
+    }
+    else {
+        typename DeltaIndex<KeyType, ValueType>::DeltaIndexRecord deltaIterObj = current_delta_index->get_iter(lookup_key);
+        deltaIterObj.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
+        deltaIter = &deltaIterObj;
+    }
 
     size_t records_left = num; // how many records are left to scan
 
@@ -420,10 +346,10 @@ size_t RSPlus<KeyType, ValueType>::scan3(const KeyType &lookup_key, const size_t
     KeyType deltaKey;       
 
     // has_next = has more things for you to read
-    while(records_left && deltaIter.has_next && dataIter != dataIterEnd){
+    while(records_left && deltaIter->get_has_next() && dataIter != dataIterEnd){
     // While both indexes have elements left:
         dataKey = (*dataIter).first;    // key of current element in learned index
-        deltaKey = deltaIter.get_key(); // key of current element in delta index
+        deltaKey = deltaIter->get_key(); // key of current element in delta index
 
         // Invariant: all changes related to keys < deltaKey have been applied
         
@@ -435,11 +361,11 @@ size_t RSPlus<KeyType, ValueType>::scan3(const KeyType &lookup_key, const size_t
         }
         // if dataKey >= deltaKey then there are changes in the delta index that we have to take into account
         else{
-            if(!deltaIter.get_is_removed()){    // skip deleted records
-                result.push_back(std::make_pair(deltaKey, deltaIter.get_val()));
+            if(!deltaIter->get_is_removed()){    // skip deleted records
+                result.push_back(std::make_pair(deltaKey, deltaIter->get_val()));
                 records_left--;
             }
-            deltaIter.advance_to_next_valid(); 
+            deltaIter->advance_to_next_valid(); 
             if(dataKey == deltaKey) dataIter++; // Assumption: no duplicates - in case of "=", skip this record since it overwritten by the changes in the delta index
         }
     }
@@ -449,10 +375,10 @@ size_t RSPlus<KeyType, ValueType>::scan3(const KeyType &lookup_key, const size_t
         learned_index_readers_updated = true;
         learned_index->readers_out++;  // atomic because we are out of the critical section
     }
-    if(!deltaIter.has_next){
+    if(!deltaIter->get_has_next()){
         delta_index_readers_updated = true;
         current_delta_index->readers_out++;  // atomic because we are out of the critical section        
-        frozen_delta_index->readers_out++;  // atomic because we are out of the critical section        
+        if(frozen_delta_index) frozen_delta_index->readers_out++;  // atomic because we are out of the critical section        
     }
 
     // If only the learned index has elements left, just add as many as you can to the results
@@ -463,19 +389,19 @@ size_t RSPlus<KeyType, ValueType>::scan3(const KeyType &lookup_key, const size_t
     }
 
     // If only the delta index has elements left, just add as many as you can to the results
-    while(records_left && deltaIter.has_next){
-        if(!deltaIter.get_is_removed()){
-            result.push_back(std::make_pair(deltaIter.get_key(), deltaIter.get_val()));
+    while(records_left && deltaIter->get_has_next()){
+        if(!deltaIter->get_is_removed()){
+            result.push_back(std::make_pair(deltaIter->get_key(), deltaIter->get_val()));
             records_left--;
         }
-        deltaIter.advance_to_next_valid();
+        deltaIter->advance_to_next_valid();
     }
 
     // For the indexes that whose readers_out counter was not increased, increase the counter
     if(!learned_index_readers_updated) learned_index->readers_out++;  // atomic because we are out of the critical section
     if(!delta_index_readers_updated) {
         current_delta_index->readers_out++;  // atomic because we are out of the critical section        
-        frozen_delta_index->readers_out++;  // atomic because we are out of the critical section       
+        if(frozen_delta_index) frozen_delta_index->readers_out++;  // atomic because we are out of the critical section       
     } 
 
     return num - records_left;

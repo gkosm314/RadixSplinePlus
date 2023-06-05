@@ -844,6 +844,11 @@ const bool &AltBtreeBuffer<key_t, val_t>::DataSource::get_is_removed() {
 }
 
 template <class key_t, class val_t>
+const bool &AltBtreeBuffer<key_t, val_t>::DataSource::get_has_next() {
+  return has_next;
+}
+
+template <class key_t, class val_t>
 AltBtreeBuffer<key_t, val_t>::RefSource::RefSource(AltBtreeBuffer *buffer)
     : next(buffer->begin) {
   assert(next);

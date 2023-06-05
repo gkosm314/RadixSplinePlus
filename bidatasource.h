@@ -4,14 +4,15 @@
 #include "deltaindex.h"
 
 template <class KeyType, class ValueType>
-class BiDataSource{
+class BiDataSource : public Source<KeyType, ValueType>{
  public:
     BiDataSource(const KeyType begin,
                  DeltaIndex<KeyType, ValueType> * const current_delta_index, DeltaIndex<KeyType, ValueType> * const frozen_delta_index);
-    void advance_to_next_valid();
-    const KeyType &get_key();
-    const ValueType &get_val();
-    const bool &get_is_removed();
+    void advance_to_next_valid() override;
+    const KeyType &get_key() override;
+    const ValueType &get_val() override;
+    const bool &get_is_removed() override;
+    const bool &get_has_next() override;
 
     bool has_next;
  
@@ -57,6 +58,11 @@ const ValueType & BiDataSource<KeyType,ValueType>::get_val(){
 template <class KeyType, class ValueType>
 const bool & BiDataSource<KeyType,ValueType>::get_is_removed(){
     return answerSource->get_is_removed();
+}
+
+template <class KeyType, class ValueType>
+const bool & BiDataSource<KeyType,ValueType>::get_has_next(){
+    return has_next;
 }
 
 template <class KeyType, class ValueType>
