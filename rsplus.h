@@ -32,6 +32,9 @@ class RSPlus{
     std::mutex delta_index_mutex;   // mutex that protects active_delta_index from being changed by compaction
     std::mutex learned_index_mutex; // mutex that protects active_learned_index from being changed by compaction
     std::mutex compaction_mutex;    // mutex that ensures that only one compaction can take place at a given time
+
+    bool find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
+    bool find_learned_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
 };
 
 template <class KeyType, class ValueType>
@@ -78,6 +81,20 @@ bool RSPlus<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val,
     // Initially we have not found the key
     bool key_found = false;
 
+    // We first look in the delta index
+    key_found = find_delta_index(lookup_key, val, deleted_flag);
+
+    // If no key could be found in the deltas, 
+    if(!key_found) key_found = find_learned_index(lookup_key, val, deleted_flag);
+
+    return key_found && !deleted_flag;
+}
+
+template <class KeyType, class ValueType>
+bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag){
+    // Initially we have not found the key
+    bool key_found = false;
+
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase
     delta_index_mutex.lock();
@@ -101,25 +118,29 @@ bool RSPlus<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val,
     }
 
     current_delta_index->readers_out++; // atomic because we are out of the critical section
+    
+    return key_found;
+}
 
-    // If no key could be found in the deltas, 
-    if(!key_found){
-        int temp_offset;
-        deleted_flag = false;   // no entry in delta => no changes => no deletion
+template <class KeyType, class ValueType>
+bool RSPlus<KeyType, ValueType>::find_learned_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag){
+    // Initially we have not found the key
+    bool key_found = false;
+    
+    int temp_offset;
+    deleted_flag = false;   // no entry in delta => no changes => no deletion
 
-        // Get reference to the learned index. Compaction cannot change them while we hold the lock.
-        // mutex => no concurrent increases => no need for atomic increase
-        learned_index_mutex.lock();
-        LearnedIndex<KeyType, ValueType> * const current_learned_index = active_learned_index;
-        current_learned_index->readers_in++; 
-        learned_index_mutex.unlock();
+    // Get reference to the learned index. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase
+    learned_index_mutex.lock();
+    LearnedIndex<KeyType, ValueType> * const current_learned_index = active_learned_index;
+    current_learned_index->readers_in++; 
+    learned_index_mutex.unlock();
 
-        key_found = current_learned_index->find(lookup_key, temp_offset, val);
-        current_learned_index->readers_out++; // atomic because we are out of the critical section
-    }
+    key_found = current_learned_index->find(lookup_key, temp_offset, val);
+    current_learned_index->readers_out++; // atomic because we are out of the critical section
 
-    return key_found && !deleted_flag;
-
+    return key_found;
 }
 
 template <class KeyType, class ValueType>
