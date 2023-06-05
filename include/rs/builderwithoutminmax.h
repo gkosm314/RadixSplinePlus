@@ -15,7 +15,9 @@ class BuilderWithoutMinMax {
  public:
   BuilderWithoutMinMax(size_t num_radix_bits = 18,
           size_t max_error = 32)
-      : num_radix_bits_(num_radix_bits),
+      : min_key_(std::numeric_limits<KeyType>::min()),
+        max_key_(std::numeric_limits<KeyType>::min()),
+        num_radix_bits_(num_radix_bits),
         max_error_(max_error),
         curr_num_keys_(0),
         curr_num_distinct_keys_(0),
