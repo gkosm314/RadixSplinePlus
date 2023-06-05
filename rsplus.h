@@ -21,7 +21,10 @@ class RSPlus{
     inline void insert(const KeyType &lookup_key, const ValueType &val);
     inline void remove(const KeyType &lookup_key);    
     void compact();
-    
+    size_t scan(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result);
+    size_t scan2(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
+                LearnedIndex<KeyType, ValueType> * const learned_index,
+                DeltaIndex<KeyType, ValueType> * const delta_index);
  private:   
     LearnedIndex<KeyType, ValueType> * active_learned_index;//L earnedIndex to which reads are directed
     LearnedIndex<KeyType, ValueType> * next_learned_index;// LearnedIndex which is currently trained
@@ -279,6 +282,97 @@ void RSPlus<KeyType, ValueType>::compact(){
 
     // Unlock mutex so that more compactions can take place
     compaction_mutex.unlock();
+}
+
+template <class KeyType, class ValueType>
+size_t RSPlus<KeyType, ValueType>::scan(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result) {
+    // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase
+    delta_index_mutex.lock();
+    DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
+    DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;  
+    current_delta_index->readers_in++;
+    if(frozen_delta_index) frozen_delta_index->readers_in++;
+    delta_index_mutex.unlock();
+
+    // Get reference to the learned index. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase
+    learned_index_mutex.lock();
+    LearnedIndex<KeyType, ValueType> * const current_learned_index = active_learned_index;
+    current_learned_index->readers_in++; 
+    learned_index_mutex.unlock();
+
+    // Prepare results vector
+    result.clear();
+    result.reserve(num);
+
+    // Call the correct version of the scan function - readers_out is increased inside each function call
+    // if(frozen_delta_index) return scan3();
+    // else return scan2(lookup_key, num, result, current_learned_index, current_delta_index);
+    return scan2(lookup_key, num, result, current_learned_index, current_delta_index);
+}
+
+template <class KeyType, class ValueType>
+size_t RSPlus<KeyType, ValueType>::scan2(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result,
+            LearnedIndex<KeyType, ValueType> * const learned_index,
+            DeltaIndex<KeyType, ValueType> * const delta_index) {            
+
+    // Grab iterators for learned index and data source for delta index
+    int learned_index_offset;
+    // get offset using lookup(), if offset is valid then increase begin iterator by that many positions, otherwise assign end iterator
+    auto dataIter = learned_index->lookup(lookup_key,learned_index_offset) ? learned_index->begin() + learned_index_offset : learned_index->end();
+    auto dataIterEnd = learned_index->end();
+
+    typename DeltaIndex<KeyType, ValueType>::DeltaIndexRecord deltaIter = delta_index->get_iter(lookup_key);
+    deltaIter.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
+
+    size_t records_left = num; // how many records are left to scan
+
+    KeyType dataKey;
+    KeyType deltaKey;       
+
+    // has_next = has more things for you to read
+    while(records_left && deltaIter.has_next && dataIter != dataIterEnd){
+    // While both indexes have elements left:
+        dataKey = (*dataIter).first;    // key of current element in learned index
+        deltaKey = deltaIter.get_key(); // key of current element in delta index
+
+        // Invariant: all changes related to keys < deltaKey have been applied
+        
+        // if dataKey < deltaKey then add dataKey to the results
+        if(dataKey < deltaKey){
+            result.push_back(*dataIter);
+            records_left--;
+            dataIter++;
+        }
+        // if dataKey >= deltaKey then there are changes in the delta index that we have to take into account
+        else{
+            if(!deltaIter.get_is_removed()){    // skip deleted records
+                result.push_back(std::make_pair(deltaKey, deltaIter.get_val()));
+                records_left--;
+            }
+            deltaIter.advance_to_next_valid(); 
+            if(dataKey == deltaKey) dataIter++; // Assumption: no duplicates - in case of "=", skip this record since it overwritten by the changes in the delta index
+        }
+    }
+
+    // If only the learned index has elements left, just add as many as you can to the results
+    while(records_left && dataIter != dataIterEnd){
+        result.push_back(*dataIter);
+        records_left--;
+        dataIter++;    
+    }
+
+    // If only the delta index has elements left, just add as many as you can to the results
+    while(records_left && deltaIter.has_next){
+        if(!deltaIter.get_is_removed()){
+            result.push_back(std::make_pair(deltaIter.get_key(), deltaIter.get_val()));
+            records_left--;
+        }
+        deltaIter.advance_to_next_valid();
+    }
+
+    return num - records_left;
 }
 
 #endif
