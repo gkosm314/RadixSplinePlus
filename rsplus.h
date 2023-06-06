@@ -15,7 +15,7 @@ class RSPlus{
 
  public:
     RSPlus();                  
-    RSPlus(std::vector<std::pair<KeyType, ValueType>> & k);
+    RSPlus(std::vector<std::pair<KeyType, ValueType>> * k);
     ~RSPlus();
 
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
@@ -50,7 +50,7 @@ RSPlus<KeyType, ValueType>::RSPlus() {
     std::vector<std::pair<KeyType, ValueType>> * k = new std::vector<std::pair<KeyType, ValueType>>;
 
     // Initialize new learned index
-    active_learned_index = new LearnedIndex<KeyType, ValueType>(*k);
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(k);
     next_learned_index = nullptr;
 
     // Create a new empty delta index to keep changes
@@ -59,7 +59,7 @@ RSPlus<KeyType, ValueType>::RSPlus() {
 }
 
 template <class KeyType, class ValueType>
-RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> & k){
+RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> * k){
     // Initialize new learned index
     active_learned_index = new LearnedIndex<KeyType, ValueType>(k);
     next_learned_index = nullptr;
@@ -257,7 +257,7 @@ void RSPlus<KeyType, ValueType>::compact(){
         deltaIter.advance_to_next_valid();
     }
 
-    next_learned_index = new LearnedIndex<KeyType, ValueType>(*kv_new_data, rsbuilder);
+    next_learned_index = new LearnedIndex<KeyType, ValueType>(kv_new_data, rsbuilder);
 
     // Do not change order of the following critical sections
     // Grab the mutex so that no other thread reads the indexes locations while you change them.

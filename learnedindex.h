@@ -11,9 +11,9 @@ template <class KeyType, class ValueType>
 class LearnedIndex{
  public:
     // constructor1 - you fill the builder
-    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k);
+    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k);
     // constructor2 - builder is already filled for you
-    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::BuilderWithoutMinMax<KeyType> & rsb); 
+    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rs::BuilderWithoutMinMax<KeyType> & rsb); 
     // destructor
     ~LearnedIndex();
     
@@ -36,15 +36,15 @@ class LearnedIndex{
 };
 
 template <class KeyType, class ValueType>
-LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k){
+LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k){
     // Initialize readers' counters
     readers_in = 0;
     readers_out = 0;
 
     // Keys should be pointing to the initial data
-    kv_data = &k;
+    kv_data = k;
     
-    if(!k.empty()){
+    if(!(*k).empty()){
         // Extract minimum and maximum value of the data you want to approximate with the spline
         min_key = kv_data->front().first;
         max_key = kv_data->back().first;
@@ -56,18 +56,18 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
 
     // Construct the spline in a single pass by iterating over the keys
     rs::Builder<KeyType> rsb(min_key, max_key);
-    for (const auto& kv_pair : k) rsb.AddKey(kv_pair.first);
+    for (const auto& kv_pair : *k) rsb.AddKey(kv_pair.first);
     rspline = rsb.Finalize();
 }
 
 template <class KeyType, class ValueType>
-LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> & k, rs::BuilderWithoutMinMax<KeyType> & rsb){
+LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rs::BuilderWithoutMinMax<KeyType> & rsb){
     // Initialize readers' counters
     readers_in = 0;
     readers_out = 0;
 
     // Keys should be pointing to the initial data
-    kv_data = &k;
+    kv_data = k;
     
     // Construct spline by finalizing the builder that was passed as a parameter
     // Nothing changes if the builder is empty
