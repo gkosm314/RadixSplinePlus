@@ -76,6 +76,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
 
 template <class KeyType, class ValueType>
 LearnedIndex<KeyType, ValueType>::~LearnedIndex(){
+    assert(readers_in == readers_out);
     delete kv_data;
 }
 

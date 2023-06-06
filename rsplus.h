@@ -198,7 +198,8 @@ void RSPlus<KeyType, ValueType>::compact(){
     kv_new_data->reserve(active_learned_index->length() + prev_delta_index->length()); 
 
     // busy wait
-    while(prev_delta_index->writers_in < prev_delta_index->writers_out){}
+    while(prev_delta_index->writers_in > prev_delta_index->writers_out){}
+    assert(prev_delta_index->writers_in == prev_delta_index->writers_out);
     // We suppose that no changes happen to the prev_delta_index after this point
     
     // Grab iterators for learned index and data source for delta index
@@ -275,11 +276,11 @@ void RSPlus<KeyType, ValueType>::compact(){
     next_learned_index = nullptr; // Reset next_learned_index pointer
 
     // busy wait
-    while(learned_index_to_garbage_collect->readers_in < learned_index_to_garbage_collect->readers_out){}
+    while(learned_index_to_garbage_collect->readers_in > learned_index_to_garbage_collect->readers_out){}
     delete learned_index_to_garbage_collect; 
 
     // busy wait
-    while(delta_index_to_garbage_collect->readers_in < delta_index_to_garbage_collect->readers_out){}
+    while(delta_index_to_garbage_collect->readers_in > delta_index_to_garbage_collect->readers_out){}
     delete delta_index_to_garbage_collect;
 
     // Unlock mutex so that more compactions can take place

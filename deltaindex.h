@@ -45,6 +45,8 @@ DeltaIndex<KeyType, ValueType>::DeltaIndex() {
 
 template <class KeyType, class ValueType>
 DeltaIndex<KeyType, ValueType>::~DeltaIndex() {
+    assert(writers_in == writers_out);
+    assert(readers_in == readers_out);
     delete buffer;
 }
 
