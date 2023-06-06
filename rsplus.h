@@ -152,7 +152,7 @@ inline void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const 
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase   
     delta_index_mutex.lock();
-    DeltaIndex<KeyType, ValueType> * current_delta_index = active_delta_index;
+    DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     current_delta_index->writers_in++;
     delta_index_mutex.unlock();
 
@@ -166,7 +166,7 @@ inline void RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key){
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase   
     delta_index_mutex.lock();
-    DeltaIndex<KeyType, ValueType> * current_delta_index = active_delta_index;
+    DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     current_delta_index->writers_in++;
     delta_index_mutex.unlock();
 
