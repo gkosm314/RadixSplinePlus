@@ -1,5 +1,6 @@
 playground/
 .vscode/
 test/
+docs/
 
 *.out

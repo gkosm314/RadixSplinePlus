@@ -104,13 +104,10 @@ bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, Val
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase
     delta_index_mutex.lock();
-
     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;  
-    
     current_delta_index->readers_in++; 
     if(frozen_delta_index) frozen_delta_index->readers_in++;
-
     delta_index_mutex.unlock();
     
     // Search for the key in the active delta index
@@ -197,7 +194,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     std::vector<std::pair<KeyType, ValueType>> * kv_new_data = new std::vector<std::pair<KeyType, ValueType>>;
     kv_new_data->reserve(active_learned_index->length() + prev_delta_index->length()); 
 
-    // busy wait - TODO: maybe replace with conditional variable
+    // busy wait
     while(prev_delta_index->writers_in < prev_delta_index->writers_out){}
     // We suppose that no changes happen to the prev_delta_index after this point
     
@@ -261,7 +258,6 @@ void RSPlus<KeyType, ValueType>::compact(){
 
     // Do not change order of the following critical sections
     // Grab the mutex so that no other thread reads the indexes locations while you change them.
-    // TODO: think if it would be better to merge them
     learned_index_mutex.lock();
     LearnedIndex<KeyType, ValueType> * learned_index_to_garbage_collect = active_learned_index;
     active_learned_index = next_learned_index;
@@ -274,12 +270,11 @@ void RSPlus<KeyType, ValueType>::compact(){
 
     next_learned_index = nullptr; // Reset next_learned_index pointer
 
-    // TODO: think about letting each reader deciding if he has to delete the index he read in case he is the last one
-    // busy wait - TODO: maybe replace with conditional variable
+    // busy wait
     while(learned_index_to_garbage_collect->readers_in < learned_index_to_garbage_collect->readers_out){}
     delete learned_index_to_garbage_collect; 
 
-    // busy wait - TODO: maybe replace with conditional variable
+    // busy wait
     while(delta_index_to_garbage_collect->readers_in < delta_index_to_garbage_collect->readers_out){}
     delete delta_index_to_garbage_collect;
 
@@ -408,7 +403,3 @@ size_t RSPlus<KeyType, ValueType>::scan_aux(const KeyType &lookup_key, const siz
 }
 
 #endif
-
-// TODO: think about different lock for delta-write and different for delta-read (compaction must take both)
-// TODO: think about different lock for active-delta and different for prev-delta (compaction must take both)
-// NOTE: maybe disable assertions for experiments

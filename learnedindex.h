@@ -90,8 +90,6 @@ bool LearnedIndex<KeyType, ValueType>::lookup(const KeyType &lookup_key, int &of
     // Returns false if such number does not exist, true otherwise
     // Note: offset will be out-of-bounds for the keys vector when the function returns false
 
-    // TODO: check dereference for performance penalty
-
     // Search bound for local search using RadixSpline
     rs::SearchBound bound = rspline.GetSearchBound(lookup_key);
     
