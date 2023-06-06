@@ -31,7 +31,7 @@ struct Source{
   virtual const key_t &get_key() = 0;
   virtual const val_t &get_val() = 0;
   virtual const bool &get_is_removed() = 0;
-  virtual const bool &get_has_next() = 0;
+  virtual const bool get_has_next() = 0;
 };
 
 namespace xindex {
@@ -149,7 +149,7 @@ class AltBtreeBuffer {
     const key_t &get_key() override;
     const val_t &get_val() override;
     const bool &get_is_removed() override;
-    const bool &get_has_next() override;
+    const bool get_has_next() override;
 
     leaf_t *next = nullptr;
     bool has_next = false;

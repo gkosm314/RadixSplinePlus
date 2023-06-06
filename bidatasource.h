@@ -12,9 +12,7 @@ class BiDataSource : public Source<KeyType, ValueType>{
     const KeyType &get_key() override;
     const ValueType &get_val() override;
     const bool &get_is_removed() override;
-    const bool &get_has_next() override;
-
-    bool has_next;
+    const bool get_has_next() override;
  
  private:
     typename DeltaIndex<KeyType, ValueType>::DeltaIndexRecord currentSource;
@@ -61,8 +59,8 @@ const bool & BiDataSource<KeyType,ValueType>::get_is_removed(){
 }
 
 template <class KeyType, class ValueType>
-const bool & BiDataSource<KeyType,ValueType>::get_has_next(){
-    return has_next;
+const bool BiDataSource<KeyType,ValueType>::get_has_next(){
+    return currentSource.get_has_next() || frozenSource.get_has_next();
 }
 
 template <class KeyType, class ValueType>
@@ -71,7 +69,7 @@ void BiDataSource<KeyType,ValueType>::advance(){
     KeyType frozenKey = frozenSource.get_key();
 
     // If both delta's are viewable
-    if(currentSource.has_next && frozenSource.has_next){
+    if(currentSource.get_has_next() && frozenSource.get_has_next()){
         // Advance the lowest key. In case of "==", advance both, since the frozen change was overwritten
         if(currentKey < frozenKey) currentSource.advance_to_next_valid();
         else if (currentKey == frozenKey){
@@ -81,24 +79,21 @@ void BiDataSource<KeyType,ValueType>::advance(){
         else frozenSource.advance_to_next_valid();
     }
     // If only one delta is still viewable, advance just this one
-    else if(currentSource.has_next && !frozenSource.has_next) currentSource.advance_to_next_valid();
-    else if(!currentSource.has_next && frozenSource.has_next) frozenSource.advance_to_next_valid();
+    else if(currentSource.get_has_next() && !frozenSource.get_has_next()) currentSource.advance_to_next_valid();
+    else if(!currentSource.get_has_next() && frozenSource.get_has_next()) frozenSource.advance_to_next_valid();
 }
 
 template <class KeyType, class ValueType>
 void BiDataSource<KeyType,ValueType>::set_answer(){
     // If both delta's are viewable
-    if(currentSource.has_next && frozenSource.has_next){
+    if(currentSource.get_has_next() && frozenSource.get_has_next()){
         // Read the change concering the lowest key. In case of "==", current delta overwrites the frozen delta 
         if(currentSource.get_key() <= frozenSource.get_key()) answerSource = &currentSource;
         else answerSource = &frozenSource;       
     }
     // If only one delta is viewable, return the viewable delta directly
-    else if(currentSource.has_next && !frozenSource.has_next) answerSource = &currentSource;
-    else if(!currentSource.has_next && frozenSource.has_next) answerSource = &frozenSource;
-
-    // Update has_next
-    has_next = currentSource.has_next || frozenSource.has_next;
+    else if(currentSource.get_has_next() && !frozenSource.get_has_next()) answerSource = &currentSource;
+    else if(!currentSource.get_has_next() && frozenSource.get_has_next()) answerSource = &frozenSource;
 }
 
 #endif
