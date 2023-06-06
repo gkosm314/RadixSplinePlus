@@ -31,7 +31,8 @@ class RSPlus{
     DeltaIndex<KeyType, ValueType> * active_delta_index; // DeltaIndex to which writes are directed
     DeltaIndex<KeyType, ValueType> * prev_delta_index; // read-only DeltaIndex from which we read values that are currently being flashed
 
-    std::mutex delta_index_mutex;   // mutex that protects active_delta_index from being changed by compaction
+    std::mutex writers_delta_index_mutex;   // mutex that protects active_delta_index acquired by writes from being changed by compaction
+    std::mutex readers_delta_index_mutex;   // mutex that protects active_delta_index acquired by reads from being changed by compaction
     std::mutex learned_index_mutex; // mutex that protects active_learned_index from being changed by compaction
     std::mutex compaction_mutex;    // mutex that ensures that only one compaction can take place at a given time
 
@@ -103,12 +104,12 @@ bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, Val
 
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase
-    delta_index_mutex.lock();
+    readers_delta_index_mutex.lock();
     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;  
     current_delta_index->readers_in++; 
     if(frozen_delta_index) frozen_delta_index->readers_in++;
-    delta_index_mutex.unlock();
+    readers_delta_index_mutex.unlock();
     
     // Search for the key in the active delta index
     key_found = current_delta_index->find(lookup_key, val, deleted_flag);
@@ -151,10 +152,10 @@ inline void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const 
    
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase   
-    delta_index_mutex.lock();
+    writers_delta_index_mutex.lock();
     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     current_delta_index->writers_in++;
-    delta_index_mutex.unlock();
+    writers_delta_index_mutex.unlock();
 
     current_delta_index->insert(lookup_key, val);
     current_delta_index->writers_out++; // atomic because we are out of the critical section
@@ -165,10 +166,10 @@ inline void RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key){
 
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase   
-    delta_index_mutex.lock();
+    writers_delta_index_mutex.lock();
     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     current_delta_index->writers_in++;
-    delta_index_mutex.unlock();
+    writers_delta_index_mutex.unlock();
 
     current_delta_index->remove(lookup_key);
     current_delta_index->writers_out++; // atomic because we are out of the critical section
@@ -184,10 +185,12 @@ void RSPlus<KeyType, ValueType>::compact(){
     DeltaIndex<KeyType, ValueType> * new_buffer = new DeltaIndex<KeyType, ValueType>();
     
     // Grab the mutex so that no other thread reads the deltas' locations while you change them.
-    delta_index_mutex.lock();
+    readers_delta_index_mutex.lock();
+    writers_delta_index_mutex.lock();
     prev_delta_index = active_delta_index;
     active_delta_index = new_buffer;
-    delta_index_mutex.unlock();
+    readers_delta_index_mutex.unlock();
+    writers_delta_index_mutex.unlock();
 
     // allocate memory before waiting => give as much time as possible to the writers to finish => wait as little as possible
     // Note: length of prev_delta_index may increase by the ongoing writes, but push_backs will resize the vector's size automatically
@@ -263,10 +266,11 @@ void RSPlus<KeyType, ValueType>::compact(){
     active_learned_index = next_learned_index;
     learned_index_mutex.unlock();  
 
-    delta_index_mutex.lock();
+    // only readers mutex required since writers do not get a reference to readers_delta_index
+    readers_delta_index_mutex.lock();
     DeltaIndex<KeyType, ValueType> * delta_index_to_garbage_collect = prev_delta_index;
     prev_delta_index = nullptr;
-    delta_index_mutex.unlock(); 
+    readers_delta_index_mutex.unlock(); 
 
     next_learned_index = nullptr; // Reset next_learned_index pointer
 
@@ -286,12 +290,12 @@ template <class KeyType, class ValueType>
 size_t RSPlus<KeyType, ValueType>::scan(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result) {
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase
-    delta_index_mutex.lock();
+    readers_delta_index_mutex.lock();
     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;  
     current_delta_index->readers_in++;
     if(frozen_delta_index) frozen_delta_index->readers_in++;
-    delta_index_mutex.unlock();
+    readers_delta_index_mutex.unlock();
 
     // Get reference to the learned index. Compaction cannot change them while we hold the lock.
     // mutex => no concurrent increases => no need for atomic increase
