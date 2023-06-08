@@ -202,7 +202,10 @@ inline bool RSPlus<KeyType, ValueType>::update(const KeyType &lookup_key, const 
         current_learned_index->writers_out++; // atomic because we are out of the critical section
         return update_in_learned_index_result;
     }
-    else return insert(lookup_key, val);
+    else {
+        insert(lookup_key, val);
+        return true;
+    }
 }
 
 template <class KeyType, class ValueType>
@@ -248,7 +251,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     kv_new_data->reserve(active_learned_index->length() + prev_delta_index->length()); 
 
     // busy wait
-    while(prev_delta_index->writers_in > prev_delta_index->writers_out && active_learned_index->writers_in > active_learned_index->writers_out){}
+    while(prev_delta_index->writers_in > prev_delta_index->writers_out || active_learned_index->writers_in > active_learned_index->writers_out){}
     assert(prev_delta_index->writers_in == prev_delta_index->writers_out);
     assert(active_learned_index->writers_in == active_learned_index->writers_out);
     // We suppose that no changes happen to the prev_delta_index after this point
