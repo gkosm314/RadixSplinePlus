@@ -95,12 +95,23 @@ inline bool AltBtreeBuffer<key_t, val_t>::get(const key_t &key, val_t &val, bool
 
 template <class key_t, class val_t>
 inline bool AltBtreeBuffer<key_t, val_t>::update(const key_t &key,
-                                                 const val_t &val) {
+                                                 const val_t &val,
+                                                 bool &found_flag) {
   leaf_t *leaf_ptr = locate_leaf_locked(key);
   int slot = leaf_ptr->find_first_larger_than_or_equal_to(key);
-  bool res = (slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key)
-                 ? leaf_ptr->vals[slot].update_ignoring_ptr(val)
-                 : false;
+
+  // returns True if it found a record and managed to update it, otherwise it returns False
+  // found_flag is set to True if a record was found, whether it was deleted or not, otherwise it is set to False
+  bool res = false;
+  if(slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key){
+    found_flag = true;
+    res = leaf_ptr->vals[slot].update_ignoring_ptr(val);
+  }
+  else{
+    found_flag = false;
+    res = false;
+  }
+
   // no version changed
   leaf_ptr->unlock();
   return res;

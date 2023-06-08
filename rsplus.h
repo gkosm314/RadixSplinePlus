@@ -20,6 +20,7 @@ class RSPlus{
 
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
     inline void insert(const KeyType &lookup_key, const ValueType &val);
+    inline bool update(const KeyType &lookup_key, const ValueType &val);
     inline void remove(const KeyType &lookup_key);    
     void compact();
     size_t scan(const KeyType &lookup_key, const size_t num, std::vector<std::pair<KeyType, ValueType>> & result);
@@ -162,6 +163,49 @@ inline void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const 
 }
 
 template <class KeyType, class ValueType>
+inline bool RSPlus<KeyType, ValueType>::update(const KeyType &lookup_key, const ValueType &val){
+    // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase   
+    writers_delta_index_mutex.lock();
+    DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
+    current_delta_index->writers_in++;  // since you increase the writers_in counter, compact will wait for you before compacting this delta
+    writers_delta_index_mutex.unlock();
+
+    // Try to update the value in the current_delta_index
+    bool key_found_in_delta = false;
+    bool update_in_delta_index_result = current_delta_index->update(lookup_key, val, key_found_in_delta);
+    current_delta_index->writers_out++; // atomic because we are out of the critical section
+
+    // If you found the key and attempted to update it, then the update succeeded or the key was deleted in the delta so the updated made no sense
+    if(key_found_in_delta) return update_in_delta_index_result;
+
+    // If you didn't find the key in the delta index, attempt to search for it in the learned index
+    // Get reference to the learned index. Compaction cannot change them while we hold the lock.
+    // mutex => no concurrent increases => no need for atomic increase
+    bool attempt_update_in_learned_index = false;
+    learned_index_mutex.lock();
+    LearnedIndex<KeyType, ValueType> * const current_learned_index = active_learned_index;
+    if(current_learned_index->updatable){
+        attempt_update_in_learned_index = true; // if the learned index is updatable, try to update it in-place
+        current_learned_index->readers_in++;    // read since we have to find the position of the key
+        current_learned_index->writers_in++;    // write since we will update the key-value pair
+    }
+    learned_index_mutex.unlock();
+
+    if(attempt_update_in_learned_index){
+        int key_position;
+        bool key_found_in_learned_index = current_learned_index->find(lookup_key, key_position);
+        current_learned_index->readers_out++; // atomic because we are out of the critical section
+
+        bool update_in_learned_index_result = false;
+        if(key_found_in_learned_index) update_in_learned_index_result = current_learned_index->update(key_position, val); //if the key was found, the update is always successful
+        current_learned_index->writers_out++; // atomic because we are out of the critical section
+        return update_in_learned_index_result;
+    }
+    else return insert(lookup_key, val);
+}
+
+template <class KeyType, class ValueType>
 inline void RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key){
 
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
@@ -191,6 +235,12 @@ void RSPlus<KeyType, ValueType>::compact(){
     active_delta_index = new_buffer;
     readers_delta_index_mutex.unlock();
     writers_delta_index_mutex.unlock();
+    // Guarantee: prev_delta_index->writers_in will not be increased after this point
+
+    learned_index_mutex.lock();
+    active_learned_index->updatable = false;
+    learned_index_mutex.unlock();
+    // Guarantee: active_learned_index->writers_in will not be increased after this point
 
     // allocate memory before waiting => give as much time as possible to the writers to finish => wait as little as possible
     // Note: length of prev_delta_index may increase by the ongoing writes, but push_backs will resize the vector's size automatically
@@ -198,8 +248,9 @@ void RSPlus<KeyType, ValueType>::compact(){
     kv_new_data->reserve(active_learned_index->length() + prev_delta_index->length()); 
 
     // busy wait
-    while(prev_delta_index->writers_in > prev_delta_index->writers_out){}
+    while(prev_delta_index->writers_in > prev_delta_index->writers_out && active_learned_index->writers_in > active_learned_index->writers_out){}
     assert(prev_delta_index->writers_in == prev_delta_index->writers_out);
+    assert(active_learned_index->writers_in == active_learned_index->writers_out);
     // We suppose that no changes happen to the prev_delta_index after this point
     
     // Grab iterators for learned index and data source for delta index
