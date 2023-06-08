@@ -31,11 +31,6 @@ class LearnedIndex{
     uint64_t readers_in;
     std::atomic<uint64_t> readers_out;
     
-    uint64_t writers_in;
-    std::atomic<uint64_t> writers_out;  
-
-    bool updatable;
-    
  private:
     std::vector<std::pair<KeyType, ValueType>> * kv_data; //The key-value store over which the active_learned_index approximates.
     rs::RadixSpline<KeyType> rspline;
@@ -46,11 +41,6 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     // Initialize readers' and writers' counters
     readers_in = 0;
     readers_out = 0;
-    writers_in = 0;
-    writers_out = 0;
-
-    // Initially the learned index accepts updates
-    updatable = true;
 
     // Keys should be pointing to the initial data
     kv_data = k;
@@ -76,11 +66,6 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     // Initialize readers' and writers' counters
     readers_in = 0;
     readers_out = 0;
-    writers_in = 0;
-    writers_out = 0;
-
-    // Initially the learned index accepts updates
-    updatable = true;
 
     // Keys should be pointing to the initial data
     kv_data = k;
@@ -93,7 +78,6 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
 template <class KeyType, class ValueType>
 LearnedIndex<KeyType, ValueType>::~LearnedIndex(){
     assert(readers_in == readers_out);
-    assert(writers_in == writers_out);
     delete kv_data;
 }
 
