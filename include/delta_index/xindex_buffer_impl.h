@@ -135,6 +135,8 @@ inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key, const bool &d
     // if you find the key-value pair, just change the value's removed status
     found_flag = true;
     res = leaf_ptr->vals[slot].remove_ignoring_ptr();
+    leaf_ptr->unlock();
+    return res;
   }
   else if(delete_as_insert_flag){ // if you failed to delete in-place and delete_as_insert_flag is set, insert a gravestone
     // if you could not find the key-value pair, then insert one and change the value's removed status as you insert it
@@ -144,10 +146,10 @@ inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key, const bool &d
       leaf_ptr->move_keys_backward(slot, 1);
       leaf_ptr->move_vals_backward(slot, 1);
 
-      // Below if we call atomic_val_t(0) there will be ambiguity between the val_t and the *ptr constructor
-      // But when we call split_n_insert_leaf we can use a placeholder 0 value, because the declaration defines the type of the value as val_t and the conflict is resolved.
+      // We use 0 as a placeholder value
       leaf_ptr->keys[slot] = key;
-      leaf_ptr->vals[slot] = atomic_val_t();
+      int val = 0;
+      leaf_ptr->vals[slot] = atomic_val_t(val);
       leaf_ptr->key_n++;
       res = leaf_ptr->vals[slot].remove_ignoring_ptr();
 
@@ -161,12 +163,14 @@ inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key, const bool &d
       // if the leaf is full, insert the key-value pair using the split_n_insert_leaf function, but use the delete_after_insert flag
       res = split_n_insert_leaf(key, 0, slot, leaf_ptr, true);
       size_est++;
+      // Do not unlock leaf_ptr here, because unlocking takes place inside split_n_insert leaf and if you unlock a second time undefined behaviour occurs
+      return res;
     }
   }
-  else res = false; // if delete_as_insert_flag was not set, do not insert gravestone, just return false
-
-  leaf_ptr->unlock();
-  return res;
+  else{
+    leaf_ptr->unlock();
+    return false; // if delete_as_insert_flag was not set, do not insert gravestone, just return false
+  }
 }
 
 template <class key_t, class val_t>
@@ -298,7 +302,7 @@ void AltBtreeBuffer<key_t, val_t>::insert_leaf(const key_t &key,
     size_est++;
     return;
   } else {
-    split_n_insert_leaf(key, val, slot, target);
+    split_n_insert_leaf(key, val, slot, target, false);
     size_est++;
   }
 }
