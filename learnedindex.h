@@ -19,20 +19,24 @@ class LearnedIndex{
     
     inline std::size_t length();
     bool lookup(const KeyType &lookup_key, int &offset); // get offset of ">=" key
-    inline bool find(const KeyType &lookup_key, int &offset); // get offset of "==" key
-    inline bool find(const KeyType &lookup_key, int &offset, ValueType &val); // get offset of "==" key and associated value
+    inline bool find(const KeyType &lookup_key, int &offset, bool &deleted_flag); // get offset of "==" key
+    inline bool find(const KeyType &lookup_key, int &offset, ValueType &val, bool &deleted_flag); // get offset of "==" key and associated value
     inline bool update(const int &position, const ValueType &val);
+    inline bool remove(const int &position);
     
     KeyType min_key, max_key;
     inline bool empty() const;
     inline typename std::vector<std::pair<KeyType, ValueType>>::iterator begin() const;
     inline typename std::vector<std::pair<KeyType, ValueType>>::iterator end() const;
+    inline bool get_is_removed(typename std::vector<std::pair<KeyType, ValueType>>::iterator & iter) const;
 
     uint64_t readers_in;
     std::atomic<uint64_t> readers_out;
     
  private:
-    std::vector<std::pair<KeyType, ValueType>> * kv_data; //The key-value store over which the active_learned_index approximates.
+    std::vector<std::pair<KeyType, ValueType>> * kv_data; // The key-value store over which the active_learned_index approximates.
+    std::vector<bool> * is_removed; // We use vector<bool> instead of a triplet because of the space-efficient implementation 
+
     rs::RadixSpline<KeyType> rspline;
 };
 
@@ -44,6 +48,9 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
 
     // Keys should be pointing to the initial data
     kv_data = k;
+
+    // Initialize is_removed so that no vector is removed initially
+    is_removed = new std::vector<bool>(kv_data->size(), false);
     
     if(!(*k).empty()){
         // Extract minimum and maximum value of the data you want to approximate with the spline
@@ -70,6 +77,9 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     // Keys should be pointing to the initial data
     kv_data = k;
     
+    // Initialize is_removed so that no vector is removed initially
+    is_removed = new std::vector<bool>(kv_data->size(), false);
+
     // Construct spline by finalizing the builder that was passed as a parameter
     // Nothing changes if the builder is empty
     rspline = rsb.Finalize();
@@ -79,6 +89,7 @@ template <class KeyType, class ValueType>
 LearnedIndex<KeyType, ValueType>::~LearnedIndex(){
     assert(readers_in == readers_out);
     delete kv_data;
+    delete is_removed;
 }
 
 template <class KeyType, class ValueType>
@@ -108,19 +119,22 @@ bool LearnedIndex<KeyType, ValueType>::lookup(const KeyType &lookup_key, int &of
 }
 
 template <class KeyType, class ValueType>
-inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offset){
+inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offset, bool &deleted_flag){
     // Finds the exact key, if it exists. Returns true if the key exists, false otherwise.
     // Uses lookup() and stores the smallest key that is greater 
     // Note: offset could be out-of-bounds for the keys vector when the function returns false
 
     bool keys_greater_or_equal_exist = lookup(lookup_key, offset);
 
-    if(keys_greater_or_equal_exist && (*kv_data)[offset].first == lookup_key) return true;
+    if(keys_greater_or_equal_exist && (*kv_data)[offset].first == lookup_key){
+        deleted_flag = (*is_removed)[offset];
+        return true;
+    }
     else return false;
 }
 
 template <class KeyType, class ValueType>
-inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offset, ValueType &val){
+inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, int &offset, ValueType &val, bool &deleted_flag){
     // Finds the exact key, if it exists. Returns true if the key exists, false otherwise.
     // Uses lookup() and stores the smallest key that is greater 
     // Note: This implementation also returns the value associated with the given key
@@ -130,6 +144,7 @@ inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, in
 
     if(keys_greater_or_equal_exist && (*kv_data)[offset].first == lookup_key){
         val = (*kv_data)[offset].second;
+        deleted_flag = (*is_removed)[offset];
         return true;
     }
     else return false;
@@ -138,7 +153,14 @@ inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, in
 template <class KeyType, class ValueType>
 inline bool LearnedIndex<KeyType, ValueType>::update(const int &position, const ValueType &val){
     (*kv_data)[position].second = val;
-    return true;
+    return !(*is_removed)[position];   // if the kv pair is removed, then return false
+}
+
+template <class KeyType, class ValueType>
+inline bool LearnedIndex<KeyType, ValueType>::remove(const int &position){
+    bool res = !(*is_removed)[position];   // we want to return false if we are asked to remove an already removed record
+    (*is_removed)[position] = true;
+    return res;
 }
 
 template <class KeyType, class ValueType>
@@ -154,6 +176,12 @@ inline typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedInde
 template <class KeyType, class ValueType>
 inline typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedIndex<KeyType, ValueType>::end() const{
     return kv_data->end();
+}
+
+template <class KeyType, class ValueType>
+inline bool LearnedIndex<KeyType, ValueType>::get_is_removed(typename std::vector<std::pair<KeyType, ValueType>>::iterator & iter) const{
+    size_t offset = iter - kv_data->begin(); // the iter is from kv_data vector -> decrease the begin() iter of this vector to get a valid offset
+    return (*is_removed)[offset];
 }
 
 #endif

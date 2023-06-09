@@ -16,7 +16,8 @@ class DeltaIndex{
     inline bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag) const; // get value of "==" key and delete status of key
     inline void insert(const KeyType &lookup_key, const ValueType &val) const;
     inline bool update(const KeyType &lookup_key, const ValueType &val, bool &found_flag) const;
-    inline void remove(const KeyType &lookup_key) const;
+    inline bool remove_in_place(const KeyType &lookup_key, bool &found_flag) const;
+    inline void remove_as_insert(const KeyType &lookup_key) const;
     inline std::size_t length();
 
     DeltaIndexRecord get_iter(const KeyType &target){
@@ -67,7 +68,7 @@ inline bool DeltaIndex<KeyType, ValueType>::find(const KeyType &lookup_key, Valu
 
 template <class KeyType, class ValueType>
 inline void DeltaIndex<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueType &val) const{
-    // Delete given key-value pair in the delta index.
+    // Insert given key-value pair in the delta index.
     // Even though we pass by reference, internally the value is inserted in the buffer, not the ref
     buffer->insert(lookup_key, val); 
 }
@@ -82,10 +83,17 @@ inline bool DeltaIndex<KeyType, ValueType>::update(const KeyType &lookup_key, co
 }
 
 template <class KeyType, class ValueType>
-inline void DeltaIndex<KeyType, ValueType>::remove(const KeyType &lookup_key) const{
+inline bool DeltaIndex<KeyType, ValueType>::remove_in_place(const KeyType &lookup_key, bool &found_flag) const{
+    // If the given key exists, delete it from the delta index. Otherwise return false
+    return buffer->remove(lookup_key, false, found_flag);
+}
+
+template <class KeyType, class ValueType>
+inline void DeltaIndex<KeyType, ValueType>::remove_as_insert(const KeyType &lookup_key) const{
     // Delete given key from delta index.
     // If the key exists, it is marked as deleted, otherwise we insert it and then mark it as deleted.
-    buffer->remove(lookup_key);
+    bool found_flag;
+    buffer->remove(lookup_key, true, found_flag);
 }
 
 #endif

@@ -125,16 +125,18 @@ inline void AltBtreeBuffer<key_t, val_t>::insert(const key_t &key,
 }
 
 template <class key_t, class val_t>
-inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key) {
+inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key, const bool &delete_as_insert_flag, bool &found_flag) {
   leaf_t *leaf_ptr = locate_leaf_locked(key);
   int slot = leaf_ptr->find_first_larger_than_or_equal_to(key);
 
   bool res;
+  found_flag = false;
   if(slot < leaf_ptr->key_n && leaf_ptr->keys[slot] == key){
     // if you find the key-value pair, just change the value's removed status
+    found_flag = true;
     res = leaf_ptr->vals[slot].remove_ignoring_ptr();
   }
-  else{
+  else if(delete_as_insert_flag){ // if you failed to delete in-place and delete_as_insert_flag is set, insert a gravestone
     // if you could not find the key-value pair, then insert one and change the value's removed status as you insert it
     // code almost the same as insert-leaf when you cannot insert by overwriting
     if (!leaf_ptr->is_full()) {
@@ -161,6 +163,7 @@ inline bool AltBtreeBuffer<key_t, val_t>::remove(const key_t &key) {
       size_est++;
     }
   }
+  else res = false; // if delete_as_insert_flag was not set, do not insert gravestone, just return false
 
   leaf_ptr->unlock();
   return res;
