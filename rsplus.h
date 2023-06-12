@@ -10,6 +10,7 @@
 #include "learnedindex.h"
 #include "deltaindex.h"
 #include "bidatasource.h"
+#include "include/BS_thread_pool.hpp"
 
 template <class KeyType, class ValueType>
 class RSPlus{
