@@ -29,9 +29,6 @@ class LearnedIndex{
     inline typename std::vector<std::pair<KeyType, ValueType>>::iterator begin() const;
     inline typename std::vector<std::pair<KeyType, ValueType>>::iterator end() const;
     inline bool get_is_removed(typename std::vector<std::pair<KeyType, ValueType>>::iterator & iter) const;
-
-    uint64_t readers_in;
-    std::atomic<uint64_t> readers_out;
     
  private:
     std::vector<std::pair<KeyType, ValueType>> * kv_data; // The key-value store over which the active_learned_index approximates.
@@ -42,9 +39,6 @@ class LearnedIndex{
 
 template <class KeyType, class ValueType>
 LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k){
-    // Initialize readers' and writers' counters
-    readers_in = 0;
-    readers_out = 0;
 
     // Keys should be pointing to the initial data
     kv_data = k;
@@ -70,10 +64,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
 
 template <class KeyType, class ValueType>
 LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rs::BuilderWithoutMinMax<KeyType> & rsb){
-    // Initialize readers' and writers' counters
-    readers_in = 0;
-    readers_out = 0;
-
+    
     // Keys should be pointing to the initial data
     kv_data = k;
     
@@ -87,7 +78,6 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
 
 template <class KeyType, class ValueType>
 LearnedIndex<KeyType, ValueType>::~LearnedIndex(){
-    assert(readers_in == readers_out);
     delete kv_data;
     delete is_removed;
 }
