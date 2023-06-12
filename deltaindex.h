@@ -24,10 +24,10 @@ class DeltaIndex{
         return DeltaIndexRecord(target, buffer);
     }
 
-    uint64_t readers_in;
+    std::atomic<uint64_t> readers_in;
     std::atomic<uint64_t> readers_out;
     
-    uint64_t writers_in;
+    std::atomic<uint64_t> writers_in;
     std::atomic<uint64_t> writers_out;  
 
  private:
