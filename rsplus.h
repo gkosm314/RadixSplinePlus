@@ -17,6 +17,7 @@ class RSPlus{
  public:
     RSPlus();                  
     RSPlus(std::vector<std::pair<KeyType, ValueType>> * k);
+    RSPlus(std::pair<KeyType, ValueType> * k, size_t num);
     ~RSPlus();
 
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
@@ -67,6 +68,17 @@ template <class KeyType, class ValueType>
 RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> * k){
     // Initialize new learned index
     active_learned_index = new LearnedIndex<KeyType, ValueType>(k);
+    next_learned_index = nullptr;
+
+    // Create a new empty delta index to keep changes
+    active_delta_index = new DeltaIndex<KeyType, ValueType>();
+    prev_delta_index = nullptr;   
+}
+
+template <class KeyType, class ValueType>
+RSPlus<KeyType, ValueType>::RSPlus(std::pair<KeyType, ValueType> * k, size_t num){
+    // Initialize new learned index
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(k,num);
     next_learned_index = nullptr;
 
     // Create a new empty delta index to keep changes

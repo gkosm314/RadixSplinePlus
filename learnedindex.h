@@ -10,9 +10,11 @@
 template <class KeyType, class ValueType>
 class LearnedIndex{
  public:
-    // constructor1 - you fill the builder
+    // constructor1 - you fill the builder from a vector of pairs
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k);
-    // constructor2 - builder is already filled for you
+    // constructor2 - you fill the builder from an array of pairs
+    LearnedIndex(std::pair<KeyType, ValueType> * kv_array, size_t num);
+    // constructor3 - builder is already filled for you
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rs::BuilderWithoutMinMax<KeyType> & rsb); 
     // destructor
     ~LearnedIndex();
@@ -60,6 +62,36 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     rs::Builder<KeyType> rsb(min_key, max_key);
     for (const auto& kv_pair : *k) rsb.AddKey(kv_pair.first);
     rspline = rsb.Finalize();
+}
+
+template <class KeyType, class ValueType>
+LearnedIndex<KeyType, ValueType>::LearnedIndex(std::pair<KeyType, ValueType> * kv_array, size_t num){
+
+    // Create empty data vector and reserve space
+    kv_data = new std::vector<std::pair<KeyType, ValueType>>;
+    kv_data->reserve(num);
+
+    // Initialize is_removed so that no vector is removed initially
+    is_removed = new std::vector<bool>(num, false);
+
+    if(num > 0){
+        // Extract minimum and maximum value of the data you want to approximate with the spline
+        min_key = kv_array[0].first;
+        max_key = kv_array[num-1].first;
+    }
+    else{
+        min_key = std::numeric_limits<KeyType>::min();
+        max_key = std::numeric_limits<KeyType>::min();
+    }
+
+    // Construct the spline in a single pass by iterating over the keys
+    rs::Builder<KeyType> rsb(min_key, max_key);
+    for (int i = 0; i < num; i++) {
+        kv_data->push_back(kv_array[i]);
+        rsb.AddKey(kv_array[i].first);
+    }
+    rspline = rsb.Finalize();
+
 }
 
 template <class KeyType, class ValueType>
