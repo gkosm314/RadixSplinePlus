@@ -15,9 +15,9 @@ template <class KeyType, class ValueType>
 class RSPlus{
 
  public:
-    RSPlus();                  
-    RSPlus(std::vector<std::pair<KeyType, ValueType>> * k);
-    RSPlus(std::pair<KeyType, ValueType> * k, size_t num);
+    RSPlus(size_t num_radix_bits = 18, size_t max_error = 32);                  
+    RSPlus(std::vector<std::pair<KeyType, ValueType>> * k, size_t num_radix_bits = 18, size_t max_error = 32);
+    RSPlus(std::pair<KeyType, ValueType> * k, size_t num, size_t num_radix_bits = 18, size_t max_error = 32);
     ~RSPlus();
 
     bool find(const KeyType &lookup_key, ValueType &val, bool &deleted_flag);
@@ -38,6 +38,9 @@ class RSPlus{
     std::shared_mutex readers_delta_index_mutex;   // mutex that protects active_delta_index acquired by reads from being changed by compaction
     std::mutex compaction_mutex;    // mutex that ensures that only one compaction can take place at a given time
 
+    size_t learned_index_radix_bits;
+    size_t learned_index_max_error;
+
     bool find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag,
                             DeltaIndex<KeyType, ValueType> * const current_delta_index,
                             DeltaIndex<KeyType, ValueType> * const frozen_delta_index);
@@ -50,13 +53,17 @@ class RSPlus{
 };
 
 template <class KeyType, class ValueType>
-RSPlus<KeyType, ValueType>::RSPlus() {
+RSPlus<KeyType, ValueType>::RSPlus(size_t num_radix_bits, size_t max_error) {
+
+    // Initialize spline parameters
+    learned_index_radix_bits = num_radix_bits;
+    learned_index_max_error = max_error;
 
     // Create empty data vector
     std::vector<std::pair<KeyType, ValueType>> * k = new std::vector<std::pair<KeyType, ValueType>>;
 
     // Initialize new learned index
-    active_learned_index = new LearnedIndex<KeyType, ValueType>(k);
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(k, num_radix_bits, max_error);
     next_learned_index = nullptr;
 
     // Create a new empty delta index to keep changes
@@ -65,9 +72,14 @@ RSPlus<KeyType, ValueType>::RSPlus() {
 }
 
 template <class KeyType, class ValueType>
-RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> * k){
+RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> * k, size_t num_radix_bits, size_t max_error){
+
+    // Initialize spline parameters
+    learned_index_radix_bits = num_radix_bits;
+    learned_index_max_error = max_error;
+
     // Initialize new learned index
-    active_learned_index = new LearnedIndex<KeyType, ValueType>(k);
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(k, num_radix_bits, max_error);
     next_learned_index = nullptr;
 
     // Create a new empty delta index to keep changes
@@ -76,9 +88,14 @@ RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> * 
 }
 
 template <class KeyType, class ValueType>
-RSPlus<KeyType, ValueType>::RSPlus(std::pair<KeyType, ValueType> * k, size_t num){
+RSPlus<KeyType, ValueType>::RSPlus(std::pair<KeyType, ValueType> * k, size_t num, size_t num_radix_bits, size_t max_error){
+
+    // Initialize spline parameters
+    learned_index_radix_bits = num_radix_bits;
+    learned_index_max_error = max_error;
+
     // Initialize new learned index
-    active_learned_index = new LearnedIndex<KeyType, ValueType>(k,num);
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(k, num, num_radix_bits, max_error);
     next_learned_index = nullptr;
 
     // Create a new empty delta index to keep changes
@@ -296,7 +313,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     deltaIter.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
 
     // Construct a radix spline builder
-    rs::BuilderWithoutMinMax<KeyType> rsbuilder{};
+    rs::BuilderWithoutMinMax<KeyType> rsbuilder{learned_index_radix_bits, learned_index_max_error};
 
     KeyType dataKey;
     KeyType deltaKey;

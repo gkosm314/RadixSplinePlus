@@ -11,9 +11,9 @@ template <class KeyType, class ValueType>
 class LearnedIndex{
  public:
     // constructor1 - you fill the builder from a vector of pairs
-    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k);
+    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, size_t num_radix_bits = 18, size_t max_error = 32);
     // constructor2 - you fill the builder from an array of pairs
-    LearnedIndex(std::pair<KeyType, ValueType> * kv_array, size_t num);
+    LearnedIndex(std::pair<KeyType, ValueType> * kv_array, size_t num, size_t num_radix_bits = 18, size_t max_error = 32);
     // constructor3 - builder is already filled for you
     LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rs::BuilderWithoutMinMax<KeyType> & rsb); 
     // destructor
@@ -40,7 +40,7 @@ class LearnedIndex{
 };
 
 template <class KeyType, class ValueType>
-LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k){
+LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, size_t num_radix_bits, size_t max_error){
 
     // Keys should be pointing to the initial data
     kv_data = k;
@@ -59,13 +59,13 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     }
 
     // Construct the spline in a single pass by iterating over the keys
-    rs::Builder<KeyType> rsb(min_key, max_key);
+    rs::Builder<KeyType> rsb(min_key, max_key, num_radix_bits, max_error);
     for (const auto& kv_pair : *k) rsb.AddKey(kv_pair.first);
     rspline = rsb.Finalize();
 }
 
 template <class KeyType, class ValueType>
-LearnedIndex<KeyType, ValueType>::LearnedIndex(std::pair<KeyType, ValueType> * kv_array, size_t num){
+LearnedIndex<KeyType, ValueType>::LearnedIndex(std::pair<KeyType, ValueType> * kv_array, size_t num, size_t num_radix_bits, size_t max_error){
 
     // Create empty data vector and reserve space
     kv_data = new std::vector<std::pair<KeyType, ValueType>>;
@@ -85,7 +85,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::pair<KeyType, ValueType> * k
     }
 
     // Construct the spline in a single pass by iterating over the keys
-    rs::Builder<KeyType> rsb(min_key, max_key);
+    rs::Builder<KeyType> rsb(min_key, max_key, num_radix_bits, max_error);
     for (int i = 0; i < num; i++) {
         kv_data->push_back(kv_array[i]);
         rsb.AddKey(kv_array[i].first);
