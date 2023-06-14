@@ -18,7 +18,9 @@ class DeltaIndex{
     inline bool update(const KeyType &lookup_key, const ValueType &val, bool &found_flag) const;
     inline bool remove_in_place(const KeyType &lookup_key, bool &found_flag) const;
     inline void remove_as_insert(const KeyType &lookup_key) const;
+    
     inline std::size_t length();
+    inline long long memory_consumption();
 
     DeltaIndexRecord get_iter(const KeyType &target){
         return DeltaIndexRecord(target, buffer);
@@ -94,6 +96,13 @@ inline void DeltaIndex<KeyType, ValueType>::remove_as_insert(const KeyType &look
     // If the key exists, it is marked as deleted, otherwise we insert it and then mark it as deleted.
     bool found_flag;
     buffer->remove(lookup_key, true, found_flag);
+}
+
+template <class KeyType, class ValueType>
+inline long long DeltaIndex<KeyType, ValueType>::memory_consumption() {
+    long long res = sizeof(*this);
+    if(buffer) res += buffer->size_in_bytes();
+    return res;
 }
 
 #endif

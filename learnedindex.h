@@ -31,6 +31,8 @@ class LearnedIndex{
     inline typename std::vector<std::pair<KeyType, ValueType>>::iterator begin() const;
     inline typename std::vector<std::pair<KeyType, ValueType>>::iterator end() const;
     inline bool get_is_removed(typename std::vector<std::pair<KeyType, ValueType>>::iterator & iter) const;
+
+    inline long long memory_consumption();
     
  private:
     std::vector<std::pair<KeyType, ValueType>> * kv_data; // The key-value store over which the active_learned_index approximates.
@@ -205,5 +207,11 @@ inline bool LearnedIndex<KeyType, ValueType>::get_is_removed(typename std::vecto
     size_t offset = iter - kv_data->begin(); // the iter is from kv_data vector -> decrease the begin() iter of this vector to get a valid offset
     return (*is_removed)[offset];
 }
+
+template <class KeyType, class ValueType>
+inline long long LearnedIndex<KeyType, ValueType>::memory_consumption() {
+    return rspline.GetSize();
+}
+
 
 #endif

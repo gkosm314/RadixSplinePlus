@@ -922,6 +922,12 @@ AltBtreeBuffer<key_t, val_t>::RefSource::get_val() {
   return *(val_ptrs[pos]);
 }
 
+template <class key_t, class val_t>
+long long AltBtreeBuffer<key_t, val_t>::size_in_bytes() const{
+  // Memory consumption in bytes, from https://github.com/curtis-sun/TLI/
+  return allocated_blocks.size() * node_n_per_block * node_size;
+}
+
 }  // namespace rspindex
 
 #endif  // 

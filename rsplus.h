@@ -26,6 +26,8 @@ class RSPlus{
     inline bool remove(const KeyType &lookup_key);    
     void compact();
     size_t scan(const KeyType &lookup_key, const size_t num, std::pair<KeyType, ValueType> * result);
+
+    inline long long memory_consumption();
  
  private:   
     LearnedIndex<KeyType, ValueType> * active_learned_index;//L earnedIndex to which reads are directed
@@ -472,6 +474,30 @@ size_t RSPlus<KeyType, ValueType>::scan_aux(const KeyType &lookup_key, const siz
     if(frozen_delta_index) frozen_delta_index->readers_out++;  // atomic because we are out of the critical section       
 
     return records_scanned;
+}
+
+template <class KeyType, class ValueType>
+inline long long RSPlus<KeyType, ValueType>::memory_consumption(){
+
+    long long res = 0;
+
+    // Get reference to delta indexes. Compaction cannot delete them while we hold the lock.
+    readers_delta_index_mutex.lock_shared();
+    DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
+    DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;
+    LearnedIndex<KeyType, ValueType> * const current_learned_index = active_learned_index;  
+    current_delta_index->readers_in++;   // atomic because we are in a shared critical section
+    if(frozen_delta_index) frozen_delta_index->readers_in++;  // atomic because we are in a shared critical section
+    readers_delta_index_mutex.unlock_shared();
+
+    res += current_learned_index->memory_consumption();
+    res += current_delta_index->memory_consumption();
+    if(frozen_delta_index) res += frozen_delta_index->memory_consumption();
+
+    current_delta_index->readers_out++; // atomic because we are out of the critical section
+    if(frozen_delta_index) frozen_delta_index->readers_out++; // atomic because we are out of the critical section
+
+    return res;
 }
 
 #endif

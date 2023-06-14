@@ -142,6 +142,7 @@ class AltBtreeBuffer {
                          std::vector<std::pair<key_t, val_t>> &result);
 
   inline uint32_t size();
+  long long size_in_bytes() const;
 
   struct DataSource : public Source<key_t, val_t> {
     DataSource(key_t begin, AltBtreeBuffer *buffer);
