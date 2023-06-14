@@ -24,12 +24,12 @@
 #include <mutex>
 #include <vector>
 
-#include "xindex_buffer.h"
+#include "buffer.h"
 
-#if !defined(xindex_buffer_IMPL_H)
-#define xindex_buffer_IMPL_H
+#if !defined(buffer_IMPL_H)
+#define buffer_IMPL_H
 
-namespace xindex {
+namespace rspindex {
 
 template <class key_t, class val_t>
 AltBtreeBuffer<key_t, val_t>::AltBtreeBuffer() {
@@ -922,6 +922,6 @@ AltBtreeBuffer<key_t, val_t>::RefSource::get_val() {
   return *(val_ptrs[pos]);
 }
 
-}  // namespace xindex
+}  // namespace rspindex
 
-#endif  // xindex_buffer_IMPL_H
+#endif  // 

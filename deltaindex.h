@@ -4,12 +4,12 @@
 #include <atomic>
 
 #include "include/delta_index/helper.h"
-#include "include/delta_index/xindex_buffer_impl.h"
+#include "include/delta_index/buffer_impl.h"
 
 template <class KeyType, class ValueType>
 class DeltaIndex{  
  public:
-    using DeltaIndexRecord = typename xindex::AltBtreeBuffer<KeyType, KeyType>::DataSource;
+    using DeltaIndexRecord = typename rspindex::AltBtreeBuffer<KeyType, KeyType>::DataSource;
 
     DeltaIndex();
     ~DeltaIndex();
@@ -31,12 +31,12 @@ class DeltaIndex{
     std::atomic<uint64_t> writers_out;  
 
  private:
-    xindex::AltBtreeBuffer<KeyType, ValueType> * buffer;      
+    rspindex::AltBtreeBuffer<KeyType, ValueType> * buffer;      
 };
 
 template <class KeyType, class ValueType>
 DeltaIndex<KeyType, ValueType>::DeltaIndex() {
-    buffer = new xindex::AltBtreeBuffer<KeyType, ValueType>();
+    buffer = new rspindex::AltBtreeBuffer<KeyType, ValueType>();
 
     //Initialize readers' and writers' counters
     readers_in = 0;

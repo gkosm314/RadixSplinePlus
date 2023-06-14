@@ -20,13 +20,13 @@
  *     https://ppopp20.sigplan.org/details/PPoPP-2020-papers/13/XIndex-A-Scalable-Learned-Index-for-Multicore-Data-Storage
  */
 
-#include "xindex_util.h"
+#include "util.h"
 #include "../../source.h"
 
-#if !defined(xindex_buffer_H)
-#define xindex_buffer_H
+#if !defined(buffer_H)
+#define buffer_H
 
-namespace xindex {
+namespace rspindex {
 
 const uint8_t alt_buf_fanout = 16;
 const uint8_t node_capacity = alt_buf_fanout - 1;
@@ -176,6 +176,6 @@ class AltBtreeBuffer {
   static const size_t node_size = std::max(sizeof(leaf_t), sizeof(internal_t));
 };
 
-}  // namespace xindex
+}
 
-#endif  // xindex_buffer_H
+#endif
