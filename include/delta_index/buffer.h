@@ -21,10 +21,18 @@
  */
 
 #include "util.h"
-#include "../../source.h"
 
 #if !defined(buffer_H)
 #define buffer_H
+
+template <class key_t, class val_t>
+struct Source{
+  virtual void advance_to_next_valid() = 0;
+  virtual const key_t &get_key() = 0;
+  virtual const val_t &get_val() = 0;
+  virtual const bool &get_is_removed() = 0;
+  virtual const bool get_has_next() = 0;
+};
 
 namespace rspindex {
 

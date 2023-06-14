@@ -2,7 +2,6 @@
 #define BIDATASOURCE_HEADER
 
 #include "deltaindex.h"
-#include "source.h"
 
 template <class KeyType, class ValueType>
 class BiDataSource : public Source<KeyType, ValueType>{
