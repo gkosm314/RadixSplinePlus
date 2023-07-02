@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace rs {
+namespace rsplus {
 
 // A CDF coordinate.
 template <class KeyType>
@@ -17,4 +17,4 @@ struct SearchBound {
   size_t end;  // Exclusive.
 };
 
-}  // namespace rs
+}  // namespace rsplus

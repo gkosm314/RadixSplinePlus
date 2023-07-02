@@ -4,7 +4,7 @@
 
 #include "radix_spline.h"
 
-namespace rs {
+namespace rsplus {
 
 template <class KeyType>
 class Serializer {
@@ -81,4 +81,4 @@ class Serializer {
   }
 };
 
-}  // namespace rs
+}  // namespace rsplus

@@ -15,7 +15,7 @@ class LearnedIndex{
     // constructor2 - you fill the builder from an array of pairs
     LearnedIndex(std::pair<KeyType, ValueType> * kv_array, size_t num, size_t num_radix_bits = 18, size_t max_error = 32);
     // constructor3 - builder is already filled for you
-    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rs::BuilderWithoutMinMax<KeyType> & rsb); 
+    LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rsplus::BuilderWithoutMinMax<KeyType> & rsb); 
     // destructor
     ~LearnedIndex();
     
@@ -38,7 +38,7 @@ class LearnedIndex{
     std::vector<std::pair<KeyType, ValueType>> * kv_data; // The key-value store over which the active_learned_index approximates.
     std::vector<bool> * is_removed; // We use vector<bool> instead of a triplet because of the space-efficient implementation 
 
-    rs::RadixSpline<KeyType> rspline;
+    rsplus::RadixSpline<KeyType> rspline;
 };
 
 template <class KeyType, class ValueType>
@@ -61,7 +61,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     }
 
     // Construct the spline in a single pass by iterating over the keys
-    rs::Builder<KeyType> rsb(min_key, max_key, num_radix_bits, max_error);
+    rsplus::Builder<KeyType> rsb(min_key, max_key, num_radix_bits, max_error);
     for (const auto& kv_pair : *k) rsb.AddKey(kv_pair.first);
     rspline = rsb.Finalize();
 }
@@ -87,7 +87,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::pair<KeyType, ValueType> * k
     }
 
     // Construct the spline in a single pass by iterating over the keys
-    rs::Builder<KeyType> rsb(min_key, max_key, num_radix_bits, max_error);
+    rsplus::Builder<KeyType> rsb(min_key, max_key, num_radix_bits, max_error);
     for (int i = 0; i < num; i++) {
         kv_data->push_back(kv_array[i]);
         rsb.AddKey(kv_array[i].first);
@@ -97,7 +97,7 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::pair<KeyType, ValueType> * k
 }
 
 template <class KeyType, class ValueType>
-LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rs::BuilderWithoutMinMax<KeyType> & rsb){
+LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, ValueType>> * k, rsplus::BuilderWithoutMinMax<KeyType> & rsb){
     
     // Keys should be pointing to the initial data
     kv_data = k;
@@ -128,7 +128,7 @@ bool LearnedIndex<KeyType, ValueType>::lookup(const KeyType &lookup_key, int &of
     // Note: offset will be out-of-bounds for the keys vector when the function returns false
 
     // Search bound for local search using RadixSpline
-    rs::SearchBound bound = rspline.GetSearchBound(lookup_key);
+    rsplus::SearchBound bound = rspline.GetSearchBound(lookup_key);
     
     // Perform binary search inside the error bounds to find the exact position
     auto start = std::begin(*kv_data) + bound.begin, last = std::begin(*kv_data) + bound.end;

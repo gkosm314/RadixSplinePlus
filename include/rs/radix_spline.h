@@ -7,7 +7,7 @@
 
 #include "common.h"
 
-namespace rs {
+namespace rsplus {
 
 // Approximates a cumulative distribution function (CDF) using spline
 // interpolation.
@@ -19,7 +19,7 @@ class RadixSpline {
   RadixSpline(KeyType min_key, KeyType max_key, size_t num_keys,
               size_t num_radix_bits, size_t num_shift_bits, size_t max_error,
               std::vector<uint32_t> radix_table,
-              std::vector<rs::Coord<KeyType>> spline_points)
+              std::vector<rsplus::Coord<KeyType>> spline_points)
       : min_key_(min_key),
         max_key_(max_key),
         num_keys_(num_keys),
@@ -101,10 +101,10 @@ class RadixSpline {
   size_t max_error_;
 
   std::vector<uint32_t> radix_table_;
-  std::vector<rs::Coord<KeyType>> spline_points_;
+  std::vector<rsplus::Coord<KeyType>> spline_points_;
 
   template <typename>
   friend class Serializer;
 };
 
-}  // namespace rs
+}  // namespace rsplus

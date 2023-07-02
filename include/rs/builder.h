@@ -7,7 +7,7 @@
 #include "common.h"
 #include "radix_spline.h"
 
-namespace rs {
+namespace rsplus {
 
 // Allows building a `RadixSpline` in a single pass over sorted data.
 template <class KeyType>
@@ -238,4 +238,4 @@ class Builder {
   Coord<KeyType> prev_point_;
 };
 
-}  // namespace rs
+}  // namespace rsplus

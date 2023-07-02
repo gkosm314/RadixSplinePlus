@@ -315,7 +315,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     deltaIter.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
 
     // Construct a radix spline builder
-    rs::BuilderWithoutMinMax<KeyType> rsbuilder{learned_index_radix_bits, learned_index_max_error};
+    rsplus::BuilderWithoutMinMax<KeyType> rsbuilder{learned_index_radix_bits, learned_index_max_error};
 
     KeyType dataKey;
     KeyType deltaKey;

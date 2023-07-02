@@ -7,7 +7,7 @@
 #include "builder.h"
 #include "radix_spline.h"
 
-namespace rs {
+namespace rsplus {
 
 // A drop-in replacement for std::multimap. Internally creates a sorted copy of
 // the data.
@@ -50,7 +50,7 @@ MultiMap<KeyType, ValueType>::MultiMap(BidirIt first, BidirIt last,
                                        size_t max_error) {
   // Empty spline.
   if (first == last) {
-    rs::Builder<KeyType> rsb(std::numeric_limits<KeyType>::min(),
+    rsplus::Builder<KeyType> rsb(std::numeric_limits<KeyType>::min(),
                              std::numeric_limits<KeyType>::max(),
                              num_radix_bits, max_error);
     rs_ = rsb.Finalize();
@@ -77,7 +77,7 @@ MultiMap<KeyType, ValueType>::MultiMap(BidirIt first, BidirIt last,
   // Create spline builder.
   const auto min_key = data_.front().first;
   const auto max_key = data_.back().first;
-  rs::Builder<KeyType> rsb(min_key, max_key, num_radix_bits, max_error);
+  rsplus::Builder<KeyType> rsb(min_key, max_key, num_radix_bits, max_error);
 
   // Build the radix spline.
   for (const auto& iter : data_) {
@@ -104,4 +104,4 @@ MultiMap<KeyType, ValueType>::find(KeyType key) const {
   return iter != data_.end() && iter->first == key ? iter : data_.end();
 }
 
-}  // namespace rs
+}  // namespace rsplus
