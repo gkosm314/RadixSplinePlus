@@ -389,92 +389,92 @@ void RSPlus<KeyType, ValueType>::compact(){
     compaction_mutex.unlock();
 }
 
-template <class KeyType, class ValueType>
-size_t RSPlus<KeyType, ValueType>::scan(const KeyType &lookup_key, const size_t num, std::pair<KeyType, ValueType> * result) {
-    // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
-    readers_delta_index_mutex.lock_shared();
-    DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
-    DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;  
-    LearnedIndex<KeyType, ValueType> * const current_learned_index = active_learned_index;
-    current_delta_index->readers_in++;  // atomic because we are in a shared critical section
-    if(frozen_delta_index) frozen_delta_index->readers_in++;  // atomic because we are in a shared critical section
-    readers_delta_index_mutex.unlock_shared();
+// template <class KeyType, class ValueType>
+// size_t RSPlus<KeyType, ValueType>::scan(const KeyType &lookup_key, const size_t num, std::pair<KeyType, ValueType> * result) {
+//     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
+//     readers_delta_index_mutex.lock_shared();
+//     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
+//     DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;  
+//     LearnedIndex<KeyType, ValueType> * const current_learned_index = active_learned_index;
+//     current_delta_index->readers_in++;  // atomic because we are in a shared critical section
+//     if(frozen_delta_index) frozen_delta_index->readers_in++;  // atomic because we are in a shared critical section
+//     readers_delta_index_mutex.unlock_shared();
   
-    // Call the correct version of the scan function - readers_out is increased inside each function call
-    return scan_aux(lookup_key, num, result, current_learned_index, current_delta_index, frozen_delta_index);
-}
+//     // Call the correct version of the scan function - readers_out is increased inside each function call
+//     return scan_aux(lookup_key, num, result, current_learned_index, current_delta_index, frozen_delta_index);
+// }
 
-template <class KeyType, class ValueType>
-size_t RSPlus<KeyType, ValueType>::scan_aux(const KeyType &lookup_key, const size_t num, std::pair<KeyType, ValueType> * result,
-            LearnedIndex<KeyType, ValueType> * const learned_index,
-            DeltaIndex<KeyType, ValueType> * const current_delta_index,       
-            DeltaIndex<KeyType, ValueType> * const frozen_delta_index) {       
+// template <class KeyType, class ValueType>
+// size_t RSPlus<KeyType, ValueType>::scan_aux(const KeyType &lookup_key, const size_t num, std::pair<KeyType, ValueType> * result,
+//             LearnedIndex<KeyType, ValueType> * const learned_index,
+//             DeltaIndex<KeyType, ValueType> * const current_delta_index,       
+//             DeltaIndex<KeyType, ValueType> * const frozen_delta_index) {       
 
-    bool learned_index_readers_updated = false;     
-    bool delta_index_readers_updated = false;     
+//     bool learned_index_readers_updated = false;     
+//     bool delta_index_readers_updated = false;     
 
-    // Grab iterators for learned index and data source for delta index
-    int learned_index_offset;
-    // get offset using lookup(), if offset is valid then increase begin iterator by that many positions, otherwise assign end iterator
-    auto dataIter = learned_index->lookup(lookup_key,learned_index_offset) ? learned_index->begin() + learned_index_offset : learned_index->end();
-    auto dataIterEnd = learned_index->end();
+//     // Grab iterators for learned index and data source for delta index
+//     int learned_index_offset;
+//     // get offset using lookup(), if offset is valid then increase begin iterator by that many positions, otherwise assign end iterator
+//     auto dataIter = learned_index->lookup(lookup_key,learned_index_offset) ? learned_index->begin() + learned_index_offset : learned_index->end();
+//     auto dataIterEnd = learned_index->end();
 
-    Source<KeyType, ValueType> * deltaIter;
+//     Source<KeyType, ValueType> * deltaIter;
 
-    if(frozen_delta_index) {
-        BiDataSource<KeyType, ValueType> deltaIterObj(lookup_key, current_delta_index, frozen_delta_index);
-        deltaIter = &deltaIterObj;
-    }
-    else {
-        typename DeltaIndex<KeyType, ValueType>::DeltaIndexRecord deltaIterObj = current_delta_index->get_iter(lookup_key);
-        deltaIterObj.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
-        deltaIter = &deltaIterObj;
-    }
+//     if(frozen_delta_index) {
+//         BiDataSource<KeyType, ValueType> deltaIterObj(lookup_key, current_delta_index, frozen_delta_index);
+//         deltaIter = &deltaIterObj;
+//     }
+//     else {
+//         typename DeltaIndex<KeyType, ValueType>::DeltaIndexRecord deltaIterObj = current_delta_index->get_iter(lookup_key);
+//         deltaIterObj.advance_to_next_valid(); //required to move pos from -1 to 0 after initialization
+//         deltaIter = &deltaIterObj;
+//     }
 
-    size_t records_scanned = 0; // how many records we have scanned so far
+//     size_t records_scanned = 0; // how many records we have scanned so far
 
-    KeyType dataKey;
-    KeyType deltaKey;       
+//     KeyType dataKey;
+//     KeyType deltaKey;       
 
-    // has_next = has more things for you to read
-    while(records_scanned < num && deltaIter->get_has_next() && dataIter != dataIterEnd){
-    // While both indexes have elements left:
-        dataKey = (*dataIter).first;    // key of current element in learned index
-        deltaKey = deltaIter->get_key(); // key of current element in delta index
+//     // has_next = has more things for you to read
+//     while(records_scanned < num && deltaIter->get_has_next() && dataIter != dataIterEnd){
+//     // While both indexes have elements left:
+//         dataKey = (*dataIter).first;    // key of current element in learned index
+//         deltaKey = deltaIter->get_key(); // key of current element in delta index
 
-        // Invariant: all changes related to keys < deltaKey have been applied
+//         // Invariant: all changes related to keys < deltaKey have been applied
         
-        // if dataKey < deltaKey then add dataKey to the results
-        if(dataKey < deltaKey){
-            if(!active_learned_index->get_is_removed(dataIter)) result[records_scanned++] = (*dataIter);
-            dataIter++;
-        }
-        // if dataKey >= deltaKey then there are changes in the delta index that we have to take into account
-        else{
-            if(!deltaIter->get_is_removed()) result[records_scanned++] = std::make_pair(deltaKey, deltaIter->get_val());
-            deltaIter->advance_to_next_valid(); 
-            if(dataKey == deltaKey) dataIter++; // Assumption: no duplicates - in case of "=", skip this record since it overwritten by the changes in the delta index
-        }
-    }
+//         // if dataKey < deltaKey then add dataKey to the results
+//         if(dataKey < deltaKey){
+//             if(!active_learned_index->get_is_removed(dataIter)) result[records_scanned++] = (*dataIter);
+//             dataIter++;
+//         }
+//         // if dataKey >= deltaKey then there are changes in the delta index that we have to take into account
+//         else{
+//             if(!deltaIter->get_is_removed()) result[records_scanned++] = std::make_pair(deltaKey, deltaIter->get_val());
+//             deltaIter->advance_to_next_valid(); 
+//             if(dataKey == deltaKey) dataIter++; // Assumption: no duplicates - in case of "=", skip this record since it overwritten by the changes in the delta index
+//         }
+//     }
 
-    // If only the learned index has elements left, just add as many as you can to the results
-    while(records_scanned < num && dataIter != dataIterEnd){
-        if(!active_learned_index->get_is_removed(dataIter)) result[records_scanned++] = (*dataIter);
-        dataIter++;    
-    }
+//     // If only the learned index has elements left, just add as many as you can to the results
+//     while(records_scanned < num && dataIter != dataIterEnd){
+//         if(!active_learned_index->get_is_removed(dataIter)) result[records_scanned++] = (*dataIter);
+//         dataIter++;    
+//     }
 
-    // If only the delta index has elements left, just add as many as you can to the results
-    while(records_scanned < num && deltaIter->get_has_next()){
-        if(!deltaIter->get_is_removed()) result[records_scanned++] = std::make_pair(deltaIter->get_key(), deltaIter->get_val());
-        deltaIter->advance_to_next_valid();
-    }
+//     // If only the delta index has elements left, just add as many as you can to the results
+//     while(records_scanned < num && deltaIter->get_has_next()){
+//         if(!deltaIter->get_is_removed()) result[records_scanned++] = std::make_pair(deltaIter->get_key(), deltaIter->get_val());
+//         deltaIter->advance_to_next_valid();
+//     }
 
-    // Increase readers_out counter
-    current_delta_index->readers_out++;  // atomic because we are out of the critical section        
-    if(frozen_delta_index) frozen_delta_index->readers_out++;  // atomic because we are out of the critical section       
+//     // Increase readers_out counter
+//     current_delta_index->readers_out++;  // atomic because we are out of the critical section        
+//     if(frozen_delta_index) frozen_delta_index->readers_out++;  // atomic because we are out of the critical section       
 
-    return records_scanned;
-}
+//     return records_scanned;
+// }
 
 template <class KeyType, class ValueType>
 inline long long RSPlus<KeyType, ValueType>::memory_consumption(){
