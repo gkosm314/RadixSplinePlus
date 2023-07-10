@@ -27,6 +27,7 @@ class RSPlus{
     void compact();
     size_t scan(const KeyType &lookup_key, const size_t num, std::pair<KeyType, ValueType> * result);
 
+    inline std::size_t size_of_buffer();
     inline long long memory_consumption();
  
  private:   
@@ -474,6 +475,11 @@ size_t RSPlus<KeyType, ValueType>::scan_aux(const KeyType &lookup_key, const siz
     if(frozen_delta_index) frozen_delta_index->readers_out++;  // atomic because we are out of the critical section       
 
     return records_scanned;
+}
+
+template <class KeyType, class ValueType>
+inline std::size_t RSPlus<KeyType, ValueType>::size_of_buffer(){
+    return active_delta_index->length();
 }
 
 template <class KeyType, class ValueType>
