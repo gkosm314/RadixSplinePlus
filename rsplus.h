@@ -39,7 +39,6 @@ class RSPlus{
 
     std::shared_mutex writers_delta_index_mutex;   // mutex that protects active_delta_index acquired by writes from being changed by compaction
     std::shared_mutex readers_delta_index_mutex;   // mutex that protects active_delta_index acquired by reads from being changed by compaction
-    std::mutex compaction_mutex;    // mutex that ensures that only one compaction can take place at a given time
 
     size_t learned_index_radix_bits;
     size_t learned_index_max_error;
@@ -283,9 +282,6 @@ inline bool RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key){
 template <class KeyType, class ValueType>
 void RSPlus<KeyType, ValueType>::compact(){
 
-    // mutex ensures only one compaction can happen at any given time
-    compaction_mutex.lock();
-
     // Allocate memory for the new buffer outside of the critical section, to hold the locks as little as possible
     DeltaIndex<KeyType, ValueType> * new_buffer = new DeltaIndex<KeyType, ValueType>();
     
@@ -386,8 +382,6 @@ void RSPlus<KeyType, ValueType>::compact(){
     delete learned_index_to_garbage_collect; 
     delete delta_index_to_garbage_collect;
 
-    // Unlock mutex so that more compactions can take place
-    compaction_mutex.unlock();
 }
 
 template <class KeyType, class ValueType>
