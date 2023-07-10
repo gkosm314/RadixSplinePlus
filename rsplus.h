@@ -6,6 +6,7 @@
 #include <iostream>
 #include <mutex>
 #include <shared_mutex>
+#include <atomic>
 
 #include "learnedindex.h"
 #include "deltaindex.h"
@@ -40,8 +41,13 @@ class RSPlus{
     std::mutex writers_delta_index_mutex;   // mutex that protects active_delta_index acquired by writes from being changed by compaction
     std::mutex readers_delta_index_mutex;   // mutex that protects active_delta_index acquired by reads from being changed by compaction
 
+    std::atomic_flag compaction_happening = ATOMIC_FLAG_INIT; // flag that ensures that only one compaction is happening at any given time
+
     size_t learned_index_radix_bits;
     size_t learned_index_max_error;
+
+    int buffer_threshold = 10; // limit after which a compaction is triggered
+    //i.e. for buffer_threshold = 10, trigger a compaction when the size of the buffer is larger than the size of the learned index / 10
 
     bool find_delta_index(const KeyType &lookup_key, ValueType &val, bool &deleted_flag,
                             DeltaIndex<KeyType, ValueType> * const current_delta_index,
@@ -187,6 +193,10 @@ inline void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const 
 
     current_delta_index->insert(lookup_key, val);
     current_delta_index->writers_out++; // atomic because we are out of the critical section
+
+    // Triggers a compaction if the condition is met
+    std::size_t buffer_size = size_of_buffer();
+    if(buffer_size >= 10000 && buffer_size >= active_learned_index->length()/buffer_threshold) compact();
 }
 
 template <class KeyType, class ValueType>
@@ -281,6 +291,9 @@ inline bool RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key){
 
 template <class KeyType, class ValueType>
 void RSPlus<KeyType, ValueType>::compact(){
+
+    // If another compaction is taking place then abort
+    if(compaction_happening.test_and_set()) return;
 
     // Allocate memory for the new buffer outside of the critical section, to hold the locks as little as possible
     DeltaIndex<KeyType, ValueType> * new_buffer = new DeltaIndex<KeyType, ValueType>();
@@ -382,6 +395,8 @@ void RSPlus<KeyType, ValueType>::compact(){
     delete learned_index_to_garbage_collect; 
     delete delta_index_to_garbage_collect;
 
+    // Change the flag, since no other compaction is happening
+    compaction_happening.clear();
 }
 
 // template <class KeyType, class ValueType>
