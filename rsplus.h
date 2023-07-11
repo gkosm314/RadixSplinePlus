@@ -5,7 +5,6 @@
 #include <utility>
 #include <iostream>
 #include <mutex>
-#include <shared_mutex>
 #include <atomic>
 
 #include "learnedindex.h"
@@ -39,7 +38,7 @@ class RSPlus{
     DeltaIndex<KeyType, ValueType> * prev_delta_index; // read-only DeltaIndex from which we read values that are currently being flashed
 
     int number_of_threads;
-    std::shared_mutex * writers_delta_index_mutex;   // mutex that protects active_delta_index acquired by writes from being changed by compaction
+    std::mutex * writers_delta_index_mutex;   // mutex that protects active_delta_index acquired by writes from being changed by compaction
     std::mutex readers_delta_index_mutex;   // mutex that protects active_delta_index acquired by reads from being changed by compaction
 
     std::atomic_flag compaction_happening = ATOMIC_FLAG_INIT; // flag that ensures that only one compaction is happening at any given time
@@ -66,7 +65,7 @@ RSPlus<KeyType, ValueType>::RSPlus(size_t num_radix_bits, size_t max_error, int 
 
     // Initialize writer mutexes
     number_of_threads = thread_num;
-    writers_delta_index_mutex = new std::shared_mutex[number_of_threads];
+    writers_delta_index_mutex = new std::mutex[number_of_threads];
 
     // Initialize spline parameters
     learned_index_radix_bits = num_radix_bits;
@@ -89,7 +88,7 @@ RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> * 
 
     // Initialize writer mutexes
     number_of_threads = thread_num;
-    writers_delta_index_mutex = new std::shared_mutex[number_of_threads];
+    writers_delta_index_mutex = new std::mutex[number_of_threads];
 
     // Initialize spline parameters
     learned_index_radix_bits = num_radix_bits;
@@ -109,7 +108,7 @@ RSPlus<KeyType, ValueType>::RSPlus(std::pair<KeyType, ValueType> * k, size_t num
 
     // Initialize writer mutexes
     number_of_threads = thread_num;
-    writers_delta_index_mutex = new std::shared_mutex[number_of_threads];
+    writers_delta_index_mutex = new std::mutex[number_of_threads];
 
     // Initialize spline parameters
     learned_index_radix_bits = num_radix_bits;
@@ -201,10 +200,10 @@ template <class KeyType, class ValueType>
 inline void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const ValueType &val, int thread_id){
    
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock. 
-    writers_delta_index_mutex[thread_id].lock_shared();
+    writers_delta_index_mutex[thread_id].lock();
     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     current_delta_index->insert(lookup_key, val);
-    writers_delta_index_mutex[thread_id].unlock_shared();
+    writers_delta_index_mutex[thread_id].unlock();
 
     // Triggers a compaction if the condition is met
     std::size_t buffer_size = size_of_buffer();
@@ -218,7 +217,7 @@ inline bool RSPlus<KeyType, ValueType>::update(const KeyType &lookup_key, const 
     bool update_result =  false;
 
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.
-    writers_delta_index_mutex[thread_id].lock_shared();
+    writers_delta_index_mutex[thread_id].lock();
     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;
 
@@ -250,7 +249,7 @@ inline bool RSPlus<KeyType, ValueType>::update(const KeyType &lookup_key, const 
         update_result = true;
     }
 
-    writers_delta_index_mutex[thread_id].unlock_shared();
+    writers_delta_index_mutex[thread_id].unlock();
 
     return update_result;
 }
@@ -262,7 +261,7 @@ inline bool RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key, int th
     bool remove_result =  false;
 
     // Get reference to delta indexes. Compaction cannot change them while we hold the lock.  
-    writers_delta_index_mutex[thread_id].lock_shared();
+    writers_delta_index_mutex[thread_id].lock();
     DeltaIndex<KeyType, ValueType> * const current_delta_index = active_delta_index;
     DeltaIndex<KeyType, ValueType> * const frozen_delta_index = prev_delta_index;
 
@@ -294,7 +293,7 @@ inline bool RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key, int th
         remove_result = true;
     }
 
-    writers_delta_index_mutex[thread_id].unlock_shared();
+    writers_delta_index_mutex[thread_id].unlock();
 
     return remove_result;
 }
