@@ -28,9 +28,6 @@ class DeltaIndex{
 
     uint64_t readers_in;
     std::atomic<uint64_t> readers_out;
-    
-    uint64_t writers_in;
-    std::atomic<uint64_t> writers_out;  
 
  private:
     rspindex::AltBtreeBuffer<KeyType, ValueType> * buffer;      
@@ -43,13 +40,10 @@ DeltaIndex<KeyType, ValueType>::DeltaIndex() {
     //Initialize readers' and writers' counters
     readers_in = 0;
     readers_out = 0;
-    writers_in = 0;
-    writers_out = 0;
 }
 
 template <class KeyType, class ValueType>
 DeltaIndex<KeyType, ValueType>::~DeltaIndex() {
-    assert(writers_in == writers_out);
     assert(readers_in == readers_out);
     delete buffer;
 }
