@@ -32,6 +32,8 @@ class RSPlus{
     inline long long memory_consumption();
  
  private:   
+    void init(size_t num_radix_bits, size_t max_error, int thread_num);
+
     LearnedIndex<KeyType, ValueType> * active_learned_index;//L earnedIndex to which reads are directed
     LearnedIndex<KeyType, ValueType> * next_learned_index;// LearnedIndex which is currently trained
     
@@ -62,7 +64,7 @@ class RSPlus{
 };
 
 template <class KeyType, class ValueType>
-RSPlus<KeyType, ValueType>::RSPlus(size_t num_radix_bits, size_t max_error, int thread_num) {
+void RSPlus<KeyType, ValueType>::init(size_t num_radix_bits, size_t max_error, int thread_num){
 
     // Initialize writer mutexes
     number_of_threads = thread_num;
@@ -72,59 +74,45 @@ RSPlus<KeyType, ValueType>::RSPlus(size_t num_radix_bits, size_t max_error, int 
     // Initialize spline parameters
     learned_index_radix_bits = num_radix_bits;
     learned_index_max_error = max_error;
+    next_learned_index = nullptr;
+
+    // Create a new empty delta index to keep changes
+    active_delta_index = new DeltaIndex<KeyType, ValueType>();
+    prev_delta_index = nullptr;  
+}
+
+template <class KeyType, class ValueType>
+RSPlus<KeyType, ValueType>::RSPlus(size_t num_radix_bits, size_t max_error, int thread_num) {
+
+    // Initialize delta indexes, spline parameters and mutexes
+    init(num_radix_bits, max_error, thread_num);
 
     // Create empty data vector
     std::vector<std::pair<KeyType, ValueType>> * k = new std::vector<std::pair<KeyType, ValueType>>;
 
     // Initialize new learned index
     active_learned_index = new LearnedIndex<KeyType, ValueType>(k, num_radix_bits, max_error);
-    next_learned_index = nullptr;
-
-    // Create a new empty delta index to keep changes
-    active_delta_index = new DeltaIndex<KeyType, ValueType>();
-    prev_delta_index = nullptr;   
+ 
 }
 
 template <class KeyType, class ValueType>
 RSPlus<KeyType, ValueType>::RSPlus(std::vector<std::pair<KeyType, ValueType>> * k, size_t num_radix_bits, size_t max_error, int thread_num){
 
-    // Initialize writer mutexes
-    number_of_threads = thread_num;
-    writers_delta_index_mutex = new std::mutex[number_of_threads];
-    readers_delta_index_mutex = new std::mutex[number_of_threads];
-
-    // Initialize spline parameters
-    learned_index_radix_bits = num_radix_bits;
-    learned_index_max_error = max_error;
+    // Initialize delta indexes, spline parameters and mutexes
+    init(num_radix_bits, max_error, thread_num);
 
     // Initialize new learned index
-    active_learned_index = new LearnedIndex<KeyType, ValueType>(k, num_radix_bits, max_error);
-    next_learned_index = nullptr;
-
-    // Create a new empty delta index to keep changes
-    active_delta_index = new DeltaIndex<KeyType, ValueType>();
-    prev_delta_index = nullptr;   
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(k, num_radix_bits, max_error); 
 }
 
 template <class KeyType, class ValueType>
 RSPlus<KeyType, ValueType>::RSPlus(std::pair<KeyType, ValueType> * k, size_t num, size_t num_radix_bits, size_t max_error, int thread_num){
 
-    // Initialize writer mutexes
-    number_of_threads = thread_num;
-    writers_delta_index_mutex = new std::mutex[number_of_threads];
-    readers_delta_index_mutex = new std::mutex[number_of_threads];
-
-    // Initialize spline parameters
-    learned_index_radix_bits = num_radix_bits;
-    learned_index_max_error = max_error;
+    // Initialize delta indexes, spline parameters and mutexes
+    init(num_radix_bits, max_error, thread_num);
 
     // Initialize new learned index
-    active_learned_index = new LearnedIndex<KeyType, ValueType>(k, num, num_radix_bits, max_error);
-    next_learned_index = nullptr;
-
-    // Create a new empty delta index to keep changes
-    active_delta_index = new DeltaIndex<KeyType, ValueType>();
-    prev_delta_index = nullptr;   
+    active_learned_index = new LearnedIndex<KeyType, ValueType>(k, num, num_radix_bits, max_error);  
 }
 
 template <class KeyType, class ValueType>
