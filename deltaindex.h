@@ -26,9 +26,6 @@ class DeltaIndex{
         return DeltaIndexRecord(target, buffer);
     }
 
-    uint64_t readers_in;
-    std::atomic<uint64_t> readers_out;
-
  private:
     rspindex::AltBtreeBuffer<KeyType, ValueType> * buffer;      
 };
@@ -36,15 +33,10 @@ class DeltaIndex{
 template <class KeyType, class ValueType>
 DeltaIndex<KeyType, ValueType>::DeltaIndex() {
     buffer = new rspindex::AltBtreeBuffer<KeyType, ValueType>();
-
-    //Initialize readers' and writers' counters
-    readers_in = 0;
-    readers_out = 0;
 }
 
 template <class KeyType, class ValueType>
 DeltaIndex<KeyType, ValueType>::~DeltaIndex() {
-    assert(readers_in == readers_out);
     delete buffer;
 }
 
