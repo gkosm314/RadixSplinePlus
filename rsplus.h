@@ -142,8 +142,8 @@ bool RSPlus<KeyType, ValueType>::find(const KeyType &lookup_key, ValueType &val,
     // Initially we have not found the key
     bool key_found = false;
 
-    // We first look in the delta index
-    key_found = find_delta_index(lookup_key, val, deleted_flag, current_delta_index, frozen_delta_index);
+    // We first look in the delta index, if it is not empty
+    if(size_of_buffer() > 0) key_found = find_delta_index(lookup_key, val, deleted_flag, current_delta_index, frozen_delta_index);
 
     // If no key could be found in the deltas, 
     if(!key_found) key_found = find_learned_index(lookup_key, val, deleted_flag, current_learned_index);
