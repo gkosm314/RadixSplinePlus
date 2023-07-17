@@ -20,7 +20,7 @@ class LearnedIndex{
     ~LearnedIndex();
     
     inline std::size_t length();
-    bool lookup(const KeyType &lookup_key, int &offset); // get offset of ">=" key
+    inline bool lookup(const KeyType &lookup_key, int &offset); // get offset of ">=" key
     inline bool find(const KeyType &lookup_key, int &offset, bool &deleted_flag); // get offset of "==" key
     inline bool find(const KeyType &lookup_key, int &offset, ValueType &val, bool &deleted_flag); // get offset of "==" key and associated value
     inline bool update(const int &position, const ValueType &val);
@@ -122,7 +122,7 @@ inline std::size_t LearnedIndex<KeyType, ValueType>::length(){
 }
 
 template <class KeyType, class ValueType>
-bool LearnedIndex<KeyType, ValueType>::lookup(const KeyType &lookup_key, int &offset){
+inline bool LearnedIndex<KeyType, ValueType>::lookup(const KeyType &lookup_key, int &offset){
     // Finds the next smallest number in keys just greater than or equal to that number and stores it in offset
     // Returns false if such number does not exist, true otherwise
     // Note: offset will be out-of-bounds for the keys vector when the function returns false
