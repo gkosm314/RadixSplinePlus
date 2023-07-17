@@ -2,6 +2,7 @@
 #define LEARNED_INDEX_HEADER
 
 #include <atomic>
+#include <boost/dynamic_bitset.hpp>
 
 #include "include/rs/builder.h"
 #include "include/rs/builderwithoutminmax.h"
@@ -36,7 +37,7 @@ class LearnedIndex{
     
  private:
     std::vector<std::pair<KeyType, ValueType>> * kv_data; // The key-value store over which the active_learned_index approximates.
-    std::vector<bool> * is_removed; // We use vector<bool> instead of a triplet because of the space-efficient implementation 
+    boost::dynamic_bitset<> * is_removed; // We use bitset for a combination of fast read performance and space-efficient implementation 
 
     rsplus::RadixSpline<KeyType> rspline;
 };
@@ -48,7 +49,8 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     kv_data = k;
 
     // Initialize is_removed so that no vector is removed initially
-    is_removed = new std::vector<bool>(kv_data->size(), false);
+    is_removed = new boost::dynamic_bitset<>(kv_data->size());
+    is_removed->reset();
     
     if(!(*k).empty()){
         // Extract minimum and maximum value of the data you want to approximate with the spline
@@ -74,7 +76,8 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::pair<KeyType, ValueType> * k
     kv_data->reserve(num);
 
     // Initialize is_removed so that no vector is removed initially
-    is_removed = new std::vector<bool>(num, false);
+    is_removed = new boost::dynamic_bitset<>(num);
+    is_removed->reset();
 
     if(num > 0){
         // Extract minimum and maximum value of the data you want to approximate with the spline
@@ -103,7 +106,8 @@ LearnedIndex<KeyType, ValueType>::LearnedIndex(std::vector<std::pair<KeyType, Va
     kv_data = k;
     
     // Initialize is_removed so that no vector is removed initially
-    is_removed = new std::vector<bool>(kv_data->size(), false);
+    is_removed = new boost::dynamic_bitset<>(kv_data->size());
+    is_removed->reset();
 
     // Construct spline by finalizing the builder that was passed as a parameter
     // Nothing changes if the builder is empty
@@ -151,7 +155,7 @@ inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, in
     bool keys_greater_or_equal_exist = lookup(lookup_key, offset);
 
     if(keys_greater_or_equal_exist && (*kv_data)[offset].first == lookup_key){
-        deleted_flag = (*is_removed)[offset];
+        deleted_flag = is_removed->test(offset);
         return true;
     }
     else return false;
@@ -168,7 +172,7 @@ inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, in
 
     if(keys_greater_or_equal_exist && (*kv_data)[offset].first == lookup_key){
         val = (*kv_data)[offset].second;
-        deleted_flag = (*is_removed)[offset];
+        deleted_flag = is_removed->test(offset);
         return true;
     }
     else return false;
@@ -177,13 +181,13 @@ inline bool LearnedIndex<KeyType, ValueType>::find(const KeyType &lookup_key, in
 template <class KeyType, class ValueType>
 inline bool LearnedIndex<KeyType, ValueType>::update(const int &position, const ValueType &val){
     (*kv_data)[position].second = val;
-    return !(*is_removed)[position];   // if the kv pair is removed, then return false
+    return !(is_removed->test(position));   // if the kv pair is removed, then return false
 }
 
 template <class KeyType, class ValueType>
 inline bool LearnedIndex<KeyType, ValueType>::remove(const int &position){
-    bool res = !(*is_removed)[position];   // we want to return false if we are asked to remove an already removed record
-    (*is_removed)[position] = true;
+    bool res = !(is_removed->test(position));   // we want to return false if we are asked to remove an already removed record
+    is_removed->set(position);
     return res;
 }
 
@@ -205,7 +209,7 @@ inline typename std::vector<std::pair<KeyType, ValueType>>::iterator LearnedInde
 template <class KeyType, class ValueType>
 inline bool LearnedIndex<KeyType, ValueType>::get_is_removed(typename std::vector<std::pair<KeyType, ValueType>>::iterator & iter) const{
     size_t offset = iter - kv_data->begin(); // the iter is from kv_data vector -> decrease the begin() iter of this vector to get a valid offset
-    return (*is_removed)[offset];
+    return is_removed->test(offset);
 }
 
 template <class KeyType, class ValueType>
