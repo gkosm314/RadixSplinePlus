@@ -7,7 +7,7 @@ This project is an attempt to extend RadixSpline, a read-only learned index, so 
 ## Credits
 The RadixSpline paper can be found [here](https://arxiv.org/abs/2004.14541)
 
-The RadixSpline code can be found [here](https://github.com/learnedsystems/radixspline).
+The original RadixSpline code can be found [here](https://github.com/learnedsystems/radixspline).
 
 For the buffer, we modified the code from the XIndex paper, which can be found [here](https://ipads.se.sjtu.edu.cn/_media/publications/tangppopp20.pdf).
 
