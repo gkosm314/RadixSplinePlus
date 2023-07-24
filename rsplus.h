@@ -160,7 +160,7 @@ bool RSPlus<KeyType, ValueType>::find_delta_index(const KeyType &lookup_key, Val
     // If a frozen_delta_index is available
     if(frozen_delta_index){
         // If no key could be found in the current dela, do an additional lookup at in the previous delta
-        if(!key_found) key_found = frozen_delta_index->find(lookup_key, val, deleted_flag);
+        if(!key_found && size_of_buffer() > 0) key_found = frozen_delta_index->find(lookup_key, val, deleted_flag);
     }
     
     return key_found;
