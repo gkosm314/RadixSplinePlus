@@ -25,7 +25,7 @@ class RSPlus{
     inline void insert(const KeyType &lookup_key, const ValueType &val, int thread_id = 0);
     inline bool update(const KeyType &lookup_key, const ValueType &val, int thread_id = 0);
     inline bool remove(const KeyType &lookup_key, int thread_id = 0);    
-    void compact();
+    void compact(int thread_id = 0);
     // size_t scan(const KeyType &lookup_key, const size_t num, std::pair<KeyType, ValueType> * result);
 
     inline std::size_t size_of_buffer();
@@ -43,7 +43,7 @@ class RSPlus{
     int number_of_threads;
     std::mutex * writers_delta_index_mutex;   // mutex that protects active_delta_index acquired by writes from being changed by compaction
 
-    std::atomic_flag compaction_happening = ATOMIC_FLAG_INIT; // flag that ensures that only one compaction is happening at any given time
+    std::mutex * compaction_happening; // flag that ensures that only one compaction is happening at any given time
 
     size_t learned_index_radix_bits;
     size_t learned_index_max_error;
@@ -68,6 +68,7 @@ void RSPlus<KeyType, ValueType>::init(size_t num_radix_bits, size_t max_error, i
     // Initialize writer mutexes
     number_of_threads = thread_num;
     writers_delta_index_mutex = new std::mutex[number_of_threads];
+    compaction_happening = new std::mutex[number_of_threads];
 
     // Initialize spline parameters
     learned_index_radix_bits = num_radix_bits;
@@ -190,7 +191,7 @@ inline void RSPlus<KeyType, ValueType>::insert(const KeyType &lookup_key, const 
 
     // Triggers a compaction if the condition is met
     std::size_t buffer_size = size_of_buffer();
-    // if(buffer_size >= 10000 && buffer_size >= active_learned_index->length()/buffer_threshold) compact();
+    // if(buffer_size >= 10000 && buffer_size >= active_learned_index->length()/buffer_threshold) compact(thread_id);
 }
 
 template <class KeyType, class ValueType>
@@ -283,10 +284,10 @@ inline bool RSPlus<KeyType, ValueType>::remove(const KeyType &lookup_key, int th
 }
 
 template <class KeyType, class ValueType>
-void RSPlus<KeyType, ValueType>::compact(){
+void RSPlus<KeyType, ValueType>::compact(int thread_id){
 
     // If another compaction is taking place then abort the compaction
-    if(compaction_happening.test_and_set()) return;
+    if(!compaction_happening[thread_id].try_lock()) return;
 
     // Allocate memory for the new buffer before you take the locks in order to hold the locks as little as possible
     DeltaIndex<KeyType, ValueType> * new_buffer = new DeltaIndex<KeyType, ValueType>();
@@ -385,7 +386,7 @@ void RSPlus<KeyType, ValueType>::compact(){
     next_learned_index = nullptr; // Reset next_learned_index pointer
 
     // Change the flag, since no other compaction is happening
-    compaction_happening.clear();
+    compaction_happening[thread_id].unlock();
 
     // busy wait
     delete learned_index_to_garbage_collect; 
